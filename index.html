@@ -160,6 +160,7 @@
                 <input type="file" id="file-pisos" accept=".docx,.pdf,.txt,.csv" />
             </div>
             <button class="btn-small" id="import-pisos-btn">📥 Importar pisos</button>
+            <button class="btn-small" id="add-piso-btn" style="background:#28a745;">➕ Añadir piso a mano</button>
             <div class="info-sync">Los cambios se sincronizan automáticamente</div>
             <div id="candidates-list"></div>
         </div>
@@ -183,9 +184,11 @@
     <!-- Candidate Modal -->
     <div id="candidate-modal-overlay"></div>
     <div id="candidate-modal">
-        <h3>Editar candidato</h3>
+        <h3 id="modal-title">Editar candidato</h3>
         <label>Nombre:</label>
         <input type="text" id="cand-nombre" />
+        <label>Dirección (para situarlo en el mapa):</label>
+        <input type="text" id="cand-direccion" placeholder="Ej: Calle Asunción 12, Sevilla" />
         <label>URL del anuncio:</label>
         <input type="text" id="cand-url" />
         <label>Precio (€):</label>
@@ -416,6 +419,7 @@
             document.getElementById('draw-cancel').addEventListener('click', cancelDibujo);
             document.getElementById('draw-undo').addEventListener('click', undoDibujo);
             document.getElementById('import-pisos-btn').addEventListener('click', importarPisos);
+            document.getElementById('add-piso-btn').addEventListener('click', nuevoCandidato);
             document.getElementById('save-cand-btn').addEventListener('click', saveCandidato);
             document.getElementById('close-modal-btn').addEventListener('click', closeModal);
             document.getElementById('candidate-modal-overlay').addEventListener('click', closeModal);
@@ -544,11 +548,25 @@
             document.getElementById('draw-info').textContent = `${verticesDibujo.length} vértices`;
         }
         
+        function nuevoCandidato() {
+            currentCandidato = null;
+            document.getElementById('modal-title').textContent = 'Nuevo piso';
+            document.getElementById('cand-nombre').value = '';
+            document.getElementById('cand-direccion').value = '';
+            document.getElementById('cand-url').value = '';
+            document.getElementById('cand-price').value = '';
+            document.getElementById('cand-foto').value = '';
+            document.getElementById('candidate-modal-overlay').classList.add('show');
+            document.getElementById('candidate-modal').classList.add('show');
+        }
+        
         window.editarCandidato = function(id) {
             currentCandidato = candidatos.find(c => c.id === id);
             if (!currentCandidato) return;
             
+            document.getElementById('modal-title').textContent = 'Editar piso';
             document.getElementById('cand-nombre').value = currentCandidato.nombre;
+            document.getElementById('cand-direccion').value = '';
             document.getElementById('cand-url').value = currentCandidato.url || '';
             document.getElementById('cand-price').value = currentCandidato.price || '';
             document.getElementById('cand-foto').value = currentCandidato.foto || '';
@@ -557,23 +575,57 @@
             document.getElementById('candidate-modal').classList.add('show');
         };
         
-        async function saveCandidato() {
-            if (!currentCandidato) return;
-            
-            const { error } = await supabase
-                .from('candidatos')
-                .update({
-                    nombre: document.getElementById('cand-nombre').value,
-                    url: document.getElementById('cand-url').value,
-                    price: parseInt(document.getElementById('cand-price').value) || null,
-                    foto: document.getElementById('cand-foto').value
-                })
-                .eq('id', currentCandidato.id);
-            
-            if (!error) {
-                await loadCandidatos();
-                closeModal();
+        // Geocodifica una dirección a {lat, lon} con Nominatim; null si no la encuentra
+        async function geocodeDireccion(texto) {
+            const q = encodeURIComponent(texto + ', Sevilla, España');
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`);
+                const data = await res.json();
+                if (!data.length) return null;
+                return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+            } catch (e) {
+                console.error(e);
+                return null;
             }
+        }
+        
+        async function saveCandidato() {
+            const nombre = document.getElementById('cand-nombre').value.trim();
+            const direccion = document.getElementById('cand-direccion').value.trim();
+            if (!nombre) { alert('Ponle al menos un nombre al piso.'); return; }
+            
+            const campos = {
+                nombre,
+                url: document.getElementById('cand-url').value || null,
+                price: parseInt(document.getElementById('cand-price').value) || null,
+                foto: document.getElementById('cand-foto').value || null
+            };
+            
+            // Si han escrito dirección, geocodificar para situarlo en el mapa
+            if (direccion) {
+                const coords = await geocodeDireccion(direccion);
+                if (coords) {
+                    campos.lat = coords.lat;
+                    campos.lon = coords.lon;
+                } else {
+                    alert('No encontré esa dirección en el mapa. Guardo el piso igualmente, pero sin marcador. Puedes editarlo y reintentar.');
+                }
+            }
+            
+            let error;
+            if (currentCandidato) {
+                ({ error } = await supabase.from('candidatos').update(campos).eq('id', currentCandidato.id));
+            } else {
+                campos.user_id = currentUser.id;
+                ({ error } = await supabase.from('candidatos').insert(campos));
+            }
+            
+            if (error) {
+                alert('No se pudo guardar el piso:\n' + error.message);
+                return;
+            }
+            await loadCandidatos();
+            closeModal();
         }
         
         window.eliminarCandidato = async function(id) {
