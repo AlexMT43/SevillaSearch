@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Búsqueda Sevilla - Colaborativo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        #map { width: 100%; height: 100%; }
+        #login-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; z-index: 999; justify-content: center; align-items: center; }
+        #login-modal.show { display: flex; }
+        #login-box { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); width: 90%; max-width: 400px; }
+        #login-box h2 { margin-bottom: 1.5rem; }
+        #login-box input { width: 100%; padding: 0.75rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; }
+        #login-box button { width: 100%; padding: 0.75rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 0.5rem; }
+        #login-box button:hover { background: #0052a3; }
+        #login-box .toggle-btn { background: #666; }
+        #login-box .toggle-btn:hover { background: #444; }
+        #login-msg { color: red; margin-bottom: 1rem; font-size: 0.9rem; }
+        .control-panel { position: fixed; top: 10px; right: 10px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 500; max-height: 80vh; overflow-y: auto; width: 320px; }
+        .panel-header { padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .panel-header h3 { font-size: 1rem; }
+        .logout-btn { background: #dc3545; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+        .panel-section { padding: 1rem; border-bottom: 1px solid #eee; }
+        .panel-section h4 { font-size: 0.9rem; margin-bottom: 0.5rem; color: #333; }
+        .input-group { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+        .input-group input { flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
+        .input-group button { padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        .input-group button:hover { background: #0052a3; }
+        .btn-small { padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; width: 100%; margin-bottom: 0.5rem; }
+        .btn-small:hover { background: #0052a3; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        #candidates-list { max-height: 300px; overflow-y: auto; font-size: 0.85rem; }
+        .candidate-item { padding: 0.5rem; background: #f5f5f5; margin-bottom: 0.5rem; border-radius: 4px; }
+        .candidate-item-header { display: flex; justify-content: space-between; align-items: center; }
+        .candidate-item-name { font-weight: bold; }
+        .candidate-item-price { color: #0066cc; font-weight: bold; }
+        .candidate-item-actions { display: flex; gap: 0.3rem; margin-top: 0.3rem; }
+        .candidate-item-actions button { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+        #zonas-list { max-height: 250px; overflow-y: auto; font-size: 0.85rem; }
+        .zona-item { padding: 0.5rem; background: #f5f5f5; margin-bottom: 0.5rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        #candidate-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); z-index: 1000; display: none; width: 90%; max-width: 450px; }
+        #candidate-modal.show { display: block; }
+        #candidate-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 999; display: none; }
+        #candidate-modal-overlay.show { display: block; }
+        #candidate-modal input { width: 100%; padding: 0.5rem; margin-bottom: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
+        #candidate-modal label { font-weight: bold; font-size: 0.9rem; display: block; margin-top: 0.5rem; }
+        #candidate-modal-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        #candidate-modal-actions button { flex: 1; padding: 0.5rem; border: none; border-radius: 4px; cursor: pointer; }
+        .modal-save { background: #28a745; color: white; }
+        .modal-save:hover { background: #218838; }
+        .modal-close { background: #6c757d; color: white; }
+        .modal-close:hover { background: #5a6268; }
+        #draw-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 500; display: none; gap: 1rem; align-items: center; }
+        #draw-bar.show { display: flex; }
+        #draw-info { font-size: 0.9rem; min-width: 200px; }
+        #draw-bar button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        #draw-undo { background: #ffc107; color: black; }
+        #draw-save { background: #28a745; color: white; }
+        #draw-cancel { background: #dc3545; color: white; }
+        .leyenda { position: fixed; bottom: 20px; right: 20px; background: white; padding: 1rem; border-radius: 8px; font-size: 0.85rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 300; }
+        .leyenda-item { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+        .leyenda-color { width: 20px; height: 20px; border-radius: 3px; }
+        .info-sync { font-size: 0.75rem; color: #666; margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="login-modal" class="show">
+        <div id="login-box">
+            <h2>🗺 Búsqueda Sevilla</h2>
+            <div id="login-msg"></div>
+            <div id="login-form">
+                <h3 style="font-size: 0.95rem; margin-bottom: 1rem;">Entra o regístrate</h3>
+                <input type="email" id="email" placeholder="Tu email" />
+                <input type="password" id="password" placeholder="Contraseña" />
+                <button id="login-btn">Entrar</button>
+                <button class="toggle-btn" id="toggle-signup">¿Sin cuenta? Registrarse aquí</button>
+            </div>
+            <div id="signup-form" style="display:none;">
+                <h3 style="font-size: 0.95rem; margin-bottom: 1rem;">Crear cuenta nueva</h3>
+                <input type="email" id="signup-email" placeholder="Tu email" />
+                <input type="password" id="signup-password" placeholder="Contraseña" />
+                <input type="password" id="signup-password-confirm" placeholder="Repetir contraseña" />
+                <button id="signup-btn">Registrarse</button>
+                <button class="toggle-btn" id="toggle-login">¿Ya tienes cuenta? Entra aquí</button>
+            </div>
+        </div>
+    </div>
+    <div class="control-panel">
+        <div class="panel-header">
+            <h3>🗺 Búsqueda Sevilla</h3>
+            <button class="logout-btn" id="logout-btn">Salir</button>
+        </div>
+        <div class="panel-section">
+            <h4>🏠 Candidatos</h4>
+            <div class="input-group">
+                <input type="file" id="file-pisos" accept=".docx,.pdf,.txt,.csv" />
+            </div>
+            <button class="btn-small" id="import-pisos-btn">📥 Importar pisos</button>
+            <div class="info-sync">Los cambios se sincronizan automáticamente</div>
+            <div id="candidates-list"></div>
+        </div>
+        <div class="panel-section">
+            <h4>✏️ Zonas dibujadas</h4>
+            <button class="btn-small" id="draw-toggle-btn">Dibujar zona</button>
+            <div id="zonas-list"></div>
+        </div>
+    </div>
+    <div id="draw-bar">
+        <span id="draw-info">0 vértices</span>
+        <button id="draw-undo">↶ Deshacer</button>
+        <button id="draw-save">✓ Guardar</button>
+        <button id="draw-cancel">✕ Cancelar</button>
+    </div>
+    <div id="candidate-modal-overlay"></div>
+    <div id="candidate-modal">
+        <h3>Editar candidato</h3>
+        <label>Nombre:</label>
+        <input type="text" id="cand-nombre" />
+        <label>URL del anuncio:</label>
+        <input type="text" id="cand-url" />
+        <label>Precio (€):</label>
+        <input type="number" id="cand-price" />
+        <label>URL de foto:</label>
+        <input type="text" id="cand-foto" />
+        <div id="candidate-modal-actions">
+            <button class="modal-save" id="save-cand-btn">Guardar</button>
+            <button class="modal-close" id="close-modal-btn">Cerrar</button>
+        </div>
+    </div>
+    <div class="leyenda">
+        <div class="leyenda-item">
+            <div class="leyenda-color" style="background: #FFD700;"></div>
+            <span>Candidatos (tu cuenta)</span>
+        </div>
+        <div class="leyenda-item">
+            <div class="leyenda-color" style="background: #90EE90;"></div>
+            <span>Zonas dibujadas</span>
+        </div>
+        <div class="leyenda-item">
+            <div class="leyenda-color" style="background: #FF6B6B;"></div>
+            <span>Puntos de referencia</span>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/turf.js/6.5.0/turf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0/+esm"></script>
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0/+esm';
+        const SUPABASE_URL = 'https://uiplwwuyibychqpgeauf.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_sXGkg8CwfGttJZO73sEM6g_AAkaj5TO';
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        let map, modoDibujo = false, verticesDibujo = [];
+        let candidatos = [], zonasManuales = [];
+        let currentUser = null, currentCandidato = null;
+        let layerCandidatos, layerManuales, layerRefs, layerDibujo;
+        const ESTILOS = {
+            manual: { color: '#228B22', weight: 2, fillColor: '#90EE90', fillOpacity: 0.4 },
+            ref: { radius: 8, fillColor: '#FF6B6B', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8 },
+            cand: { radius: 6, fillColor: '#FFD700', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8 }
+        };
+        const REFS = [
+            { nombre: 'C.C. Aleste', lat: 37.4067, lon: -5.9080 },
+            { nombre: 'Acar Tablada', lat: 37.3692, lon: -6.0098 }
+        ];
+        document.getElementById('toggle-signup').addEventListener('click', () => {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('signup-form').style.display = 'block';
+        });
+        document.getElementById('toggle-login').addEventListener('click', () => {
+            document.getElementById('signup-form').style.display = 'none';
+            document.getElementById('login-form').style.display = 'block';
+        });
+        document.getElementById('login-btn').addEventListener('click', loginUser);
+        document.getElementById('signup-btn').addEventListener('click', signupUser);
+        document.getElementById('logout-btn').addEventListener('click', logoutUser);
+        async function loginUser() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            if (!email || !password) { showMsg('Email y contraseña requeridos'); return; }
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) { showMsg(error.message); return; }
+            currentUser = data.user;
+            hideLoginModal();
+            await initializeApp();
+        }
+        async function signupUser() {
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const confirm = document.getElementById('signup-password-confirm').value;
+            if (!email || !password || !confirm) { showMsg('Todos los campos requeridos'); return; }
+            if (password !== confirm) { showMsg('Las contraseñas no coinciden'); return; }
+            const { data, error } = await supabase.auth.signUp({ email, password });
+            if (error) { showMsg(error.message); return; }
+            currentUser = data.user;
+            hideLoginModal();
+            await initializeApp();
+        }
+        async function logoutUser() {
+            await supabase.auth.signOut();
+            currentUser = null;
+            location.reload();
+        }
+        function showMsg(msg) { document.getElementById('login-msg').textContent = msg; }
+        function hideLoginModal() { document.getElementById('login-modal').classList.remove('show'); }
+        async function initializeApp() {
+            initMap();
+            await loadCandidatos();
+            await loadZonasManuales();
+            setupRealtimeListeners();
+            setupUIListeners();
+        }
+        function initMap() {
+            map = L.map('map').setView([37.39, -5.98], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap', maxZoom: 19
+            }).addTo(map);
+            layerManuales = L.featureGroup().addTo(map);
+            layerRefs = L.featureGroup().addTo(map);
+            layerCandidatos = L.featureGroup().addTo(map);
+            layerDibujo = L.featureGroup().addTo(map);
+            REFS.forEach(ref => {
+                L.circleMarker([ref.lat, ref.lon], ESTILOS.ref).bindPopup(ref.nombre).addTo(layerRefs);
+            });
+        }
+        async function loadCandidatos() {
+            const { data, error } = await supabase.from('candidatos').select('*').eq('user_id', currentUser.id);
+            if (error) { console.error(error); return; }
+            candidatos = data || [];
+            renderCandidatos();
+        }
+        async function loadZonasManuales() {
+            const { data, error } = await supabase.from('zonas_manuales').select('*').eq('user_id', currentUser.id);
+            if (error) { console.error(error); return; }
+            zonasManuales = data || [];
+            renderZonasManuales();
+        }
+        function setupRealtimeListeners() {
+            supabase.channel('candidatos-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'candidatos', filter: `user_id=eq.${currentUser.id}` }, () => loadCandidatos()).subscribe();
+            supabase.channel('zonas-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'zonas_manuales', filter: `user_id=eq.${currentUser.id}` }, () => loadZonasManuales()).subscribe();
+        }
+        function setupUIListeners() {
+            document.getElementById('draw-toggle-btn').addEventListener('click', toggleDibujo);
+            document.getElementById('draw-save').addEventListener('click', saveDibujo);
+            document.getElementById('draw-cancel').addEventListener('click', cancelDibujo);
+            document.getElementById('draw-undo').addEventListener('click', undoDibujo);
+            document.getElementById('import-pisos-btn').addEventListener('click', importarPisos);
+            document.getElementById('save-cand-btn').addEventListener('click', saveCandidato);
+            document.getElementById('close-modal-btn').addEventListener('click', closeModal);
+            document.getElementById('candidate-modal-overlay').addEventListener('click', closeModal);
+            map.on('click', handleMapClick);
+        }
+        function renderCandidatos() {
+            const list = document.getElementById('candidates-list');
+            list.innerHTML = '';
+            candidatos.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'candidate-item';
+                div.innerHTML = `<div class="candidate-item-header"><span class="candidate-item-name">${c.nombre}</span><span class="candidate-item-price">${c.price ? c.price + '€' : '-'}</span></div><div class="candidate-item-actions"><button onclick="window.editarCandidato('${c.id}')">✎ Editar</button><button onclick="window.eliminarCandidato('${c.id}')" class="btn-danger">🗑 Eliminar</button></div>`;
+                list.appendChild(div);
+            });
+            renderCandidatosMap();
+        }
+        function renderCandidatosMap() {
+            layerCandidatos.clearLayers();
+            candidatos.forEach(c => {
+                if (c.lat && c.lon) {
+                    const marker = L.circleMarker([c.lat, c.lon], ESTILOS.cand);
+                    let popup = `<b>${c.nombre}</b><br>`;
+                    if (c.price) popup += `${c.price}€<br>`;
+                    if (c.url) popup += `<a href="${c.url}" target="_blank">Ver anuncio ↗</a>`;
+                    marker.bindPopup(popup);
+                    marker.addTo(layerCandidatos);
+                }
+            });
+        }
+        function renderZonasManuales() {
+            const list = document.getElementById('zonas-list');
+            list.innerHTML = '';
+            zonasManuales.forEach(z => {
+                const div = document.createElement('div');
+                div.className = 'zona-item';
+                div.innerHTML = `<span>${z.nombre}</span><button onclick="window.eliminarZona('${z.id}')" class="btn-danger">🗑</button>`;
+                list.appendChild(div);
+            });
+            renderZonasMap();
+        }
+        function renderZonasMap() {
+            layerManuales.clearLayers();
+            zonasManuales.forEach(z => {
+                if (z.geojson) {
+                    L.geoJSON(z.geojson, { style: ESTILOS.manual }).addTo(layerManuales);
+                }
+            });
+        }
+        function toggleDibujo() {
+            modoDibujo = !modoDibujo;
+            document.getElementById('draw-bar').classList.toggle('show');
+            if (!modoDibujo) {
+                verticesDibujo = [];
+                layerDibujo.clearLayers();
+            }
+        }
+        function handleMapClick(e) {
+            if (modoDibujo) {
+                verticesDibujo.push([e.latlng.lat, e.latlng.lng]);
+                layerDibujo.clearLayers();
+                verticesDibujo.forEach(v => L.circleMarker(v, { radius: 4, color: 'red' }).addTo(layerDibujo));
+                if (verticesDibujo.length > 1) {
+                    L.polyline(verticesDibujo, { color: 'red', weight: 2, dashArray: '5,5' }).addTo(layerDibujo);
+                }
+                document.getElementById('draw-info').textContent = `${verticesDibujo.length} vértices`;
+            }
+        }
+        async function saveDibujo() {
+            if (verticesDibujo.length < 3) { alert('Necesitas al menos 3 vértices'); return; }
+            const nombre = prompt('Nombre de la zona:');
+            if (!nombre) return;
+            const geojson = { type: 'Polygon', coordinates: [[...verticesDibujo.map(v => [v[1], v[0]]), [verticesDibujo[0][1], verticesDibujo[0][0]]]] };
+            const { error } = await supabase.from('zonas_manuales').insert({ user_id: currentUser.id, nombre, geojson });
+            if (!error) {
+                await loadZonasManuales();
+                cancelDibujo();
+            }
+        }
+        function cancelDibujo() {
+            modoDibujo = false;
+            verticesDibujo = [];
+            layerDibujo.clearLayers();
+            document.getElementById('draw-bar').classList.remove('show');
+        }
+        function undoDibujo() {
+            verticesDibujo.pop();
+            layerDibujo.clearLayers();
+            verticesDibujo.forEach(v => L.circleMarker(v, { radius: 4, color: 'red' }).addTo(layerDibujo));
+            if (verticesDibujo.length > 1) {
+                L.polyline(verticesDibujo, { color: 'red', weight: 2, dashArray: '5,5' }).addTo(layerDibujo);
+            }
+            document.getElementById('draw-info').textContent = `${verticesDibujo.length} vértices`;
+        }
+        window.editarCandidato = function(id) {
+            currentCandidato = candidatos.find(c => c.id === id);
+            if (!currentCandidato) return;
+            document.getElementById('cand-nombre').value = currentCandidato.nombre;
+            document.getElementById('cand-url').value = currentCandidato.url || '';
+            document.getElementById('cand-price').value = currentCandidato.price || '';
+            document.getElementById('cand-foto').value = currentCandidato.foto || '';
+            document.getElementById('candidate-modal-overlay').classList.add('show');
+            document.getElementById('candidate-modal').classList.add('show');
+        };
+        async function saveCandidato() {
+            if (!currentCandidato) return;
+            const { error } = await supabase.from('candidatos').update({
+                nombre: document.getElementById('cand-nombre').value,
+                url: document.getElementById('cand-url').value,
+                price: parseInt(document.getElementById('cand-price').value) || null,
+                foto: document.getElementById('cand-foto').value
+            }).eq('id', currentCandidato.id);
+            if (!error) {
+                await loadCandidatos();
+                closeModal();
+            }
+        }
+        window.eliminarCandidato = async function(id) {
+            if (!confirm('¿Eliminar este candidato?')) return;
+            await supabase.from('candidatos').delete().eq('id', id);
+            await loadCandidatos();
+        };
+        window.eliminarZona = async function(id) {
+            if (!confirm('¿Eliminar esta zona?')) return;
+            await supabase.from('zonas_manuales').delete().eq('id', id);
+            await loadZonasManuales();
+        };
+        function closeModal() {
+            document.getElementById('candidate-modal-overlay').classList.remove('show');
+            document.getElementById('candidate-modal').classList.remove('show');
+            currentCandidato = null;
+        }
+        async function importarPisos() {
+            const file = document.getElementById('file-pisos').files[0];
+            if (!file) { alert('Selecciona un archivo'); return; }
+            let texto = '';
+            if (file.name.endsWith('.docx')) {
+                const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+                texto = result.value;
+            } else if (file.name.endsWith('.pdf')) {
+                const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    texto += content.items.map(it => it.str).join(' ');
+                }
+            } else {
+                texto = await file.text();
+            }
+            await parsearYGeocificarPisos(texto);
+        }
+        async function parsearYGeocificarPisos(texto) {
+            const reDir = /\b(?:calle|c\/|c\.|avenida|avda|av|plaza|pza|paseo|camino|carretera|ctra|ronda|barriada|bda|urbanización|urb)\.?\s+[a-záéíóúüñ''\\-]+(?:\s+[a-záéíóúüñ''\\-]+){0,4}(?:\s*,?\s*(?:n[ºo°]?\s*)?(\d{1,4}))?/gi;
+            const rePrecio = /(\d+(?:\.\d{3})*|\d+)\s*€/g;
+            const reUrl = /https?:\/\/[^\s]+/g;
+            const reFoto = /https?:\/\/[^\s]*\.(?:jpg|jpeg|png|gif|webp)/gi;
+            let pisos = [];
+            let match;
+            while ((match = reDir.exec(texto)) !== null) {
+                const dir = match[0];
+                const ini = match.index;
+                const ventana = texto.slice(Math.max(0, ini - 100), ini + 150);
+                let precio = null;
+                let precioMatch = rePrecio.exec(ventana);
+                if (precioMatch) precio = parseInt(precioMatch[1].replace(/\./g, ''));
+                let url = null;
+                let urlMatch = reUrl.exec(ventana);
+                if (urlMatch) url = urlMatch[0];
+                let foto = null;
+                let fotoMatch = reFoto.exec(ventana);
+                if (fotoMatch) foto = fotoMatch[0];
+                pisos.push({ direccion: dir, precio, url, foto });
+            }
+            for (const piso of pisos.slice(0, 30)) {
+                await geocodificarPiso(piso);
+                await new Promise(r => setTimeout(r, 1200));
+            }
+        }
+        async function geocodificarPiso(piso) {
+            const q = encodeURIComponent(piso.direccion + ', Sevilla, España');
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`);
+                const data = await res.json();
+                if (data.length === 0) return;
+                const { lat, lon } = data[0];
+                const { error } = await supabase.from('candidatos').insert({
+                    user_id: currentUser.id,
+                    nombre: piso.direccion,
+                    url: piso.url,
+                    price: piso.precio,
+                    foto: piso.foto,
+                    lat: parseFloat(lat),
+                    lon: parseFloat(lon)
+                });
+                if (!error) await loadCandidatos();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        window.addEventListener('DOMContentLoaded', async () => {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) {
+                currentUser = data.session.user;
+                hideLoginModal();
+                await initializeApp();
+            }
+        });
+    </script>
+</body>
+</html>
