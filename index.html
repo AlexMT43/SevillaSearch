@@ -51,6 +51,8 @@
         .btn-small:hover { background: #0052a3; }
         .btn-danger { background: #dc3545; }
         .btn-danger:hover { background: #c82333; }
+        .btn-success { background: #28a745; color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 3px; cursor: pointer; font-size: 0.85rem; }
+        .btn-success:hover { background: #218838; }
         
         #candidates-list { max-height: 300px; overflow-y: auto; font-size: 0.85rem; }
         .candidate-item { padding: 0.5rem; background: #f5f5f5; margin-bottom: 0.5rem; border-radius: 4px; }
@@ -170,6 +172,12 @@
             <h4>✏️ Zonas dibujadas</h4>
             <button class="btn-small" id="draw-toggle-btn">Dibujar zona</button>
             <div id="zonas-list"></div>
+        </div>
+        
+        <!-- Barrios descartados -->
+        <div class="panel-section">
+            <h4>🚫 Barrios descartados</h4>
+            <div id="barrios-descartados-list"></div>
         </div>
     </div>
     
@@ -443,8 +451,34 @@
             
             if (error) { console.error(error); return; }
             barrios_descartados = (data || []).map(d => d.barrio_name);
+            renderBarriosDescartadosList();
             renderBarrios();
         }
+        
+        function renderBarriosDescartadosList() {
+            const list = document.getElementById('barrios-descartados-list');
+            if (!barrios_descartados || barrios_descartados.length === 0) {
+                list.innerHTML = '<div class="info-sync">Ninguno descartado</div>';
+                return;
+            }
+            list.innerHTML = '';
+            barrios_descartados.forEach(nombre => {
+                const div = document.createElement('div');
+                div.className = 'zona-item';
+                div.innerHTML = `
+                    <span>${nombre}</span>
+                    <button onclick="window.recuperarBarrio('${nombre}')" class="btn-success">↶</button>
+                `;
+                list.appendChild(div);
+            });
+        }
+        
+        window.recuperarBarrio = async function(nombre) {
+            await supabase.from('barrios_descartados')
+                .delete()
+                .eq('barrio_name', nombre);
+            await loadBarriosDescartados();
+        };
         
         function setupRealtimeListeners() {
             supabase.channel('candidatos-changes')
