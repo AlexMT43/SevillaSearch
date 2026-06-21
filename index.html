@@ -384,21 +384,15 @@
             if (!barriosData) return;
             layerBarrios.clearLayers();
             
-            // Debug: mostrar qué propiedades tiene el primer feature
-            if (barriosData.features && barriosData.features.length > 0) {
-                console.log('Propiedades del primer barrio:', Object.keys(barriosData.features[0].properties || {}));
-                console.log('Valores:', barriosData.features[0].properties);
-            }
-            
             L.geoJSON(barriosData, {
                 style: (feature) => {
                     const p = feature.properties || {};
-                    const nombre = p.NOMBRE || p.nombre || p.NOMBRE_BARRIO || p.barrio || p.name || p.Name || 'Barrio';
+                    const nombre = p.Barrio || 'Barrio desconocido';
                     return barrios_descartados.includes(nombre) ? ESTILOS.descartada : ESTILOS.barrio;
                 },
                 onEachFeature: (feature, layer) => {
                     const p = feature.properties || {};
-                    const nombre = p.NOMBRE || p.nombre || p.NOMBRE_BARRIO || p.barrio || p.name || p.Name || 'Barrio';
+                    const nombre = p.Barrio || 'Barrio desconocido';
                     const descartado = barrios_descartados.includes(nombre);
                     
                     layer.bindTooltip(String(nombre) + (descartado ? ' (descartado)' : ''), { sticky: true });
