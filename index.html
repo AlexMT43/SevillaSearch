@@ -59,8 +59,13 @@
         .candidate-item-header { display: flex; justify-content: space-between; align-items: center; }
         .candidate-item-name { font-weight: bold; }
         .candidate-item-price { color: #0066cc; font-weight: bold; }
-        .candidate-item-actions { display: flex; gap: 0.3rem; margin-top: 0.3rem; }
-        .candidate-item-actions button { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+        .candidate-item-actions { display: flex; gap: 0.3rem; margin-top: 0.5rem; }
+        .candidate-item-actions button { padding: 0.5rem 0.4rem; font-size: 0.78rem; flex: 1; border:none; border-radius:4px; background:#0066cc; color:white; cursor:pointer; }
+        .candidate-detalle { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #ccc; }
+        .det-row { font-size: 0.82rem; color: #555; margin-bottom: 4px; }
+        .det-notas { font-size: 0.8rem; background: #fff8e1; padding: 6px 8px; border-radius: 4px; margin-bottom: 8px; line-height: 1.35; }
+        .btn-ver-anuncio { display: block; text-align: center; background: #ff6600; color: white; padding: 11px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 0.9rem; margin-bottom: 6px; }
+        .btn-ver-anuncio:active { background: #cc5200; }
         
         #zonas-list { max-height: 250px; overflow-y: auto; font-size: 0.85rem; }
         .zona-item { padding: 0.5rem; background: #f5f5f5; margin-bottom: 0.5rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
@@ -111,6 +116,22 @@
         .leyenda-color { width: 20px; height: 20px; border-radius: 3px; }
         
         .info-sync { font-size: 0.75rem; color: #666; margin-top: 0.5rem; }
+        .control-panel.collapsed #panel-body { display: none; }
+
+        /* Móvil */
+        @media (max-width: 600px) {
+            .control-panel {
+                top: 0; right: 0; left: 0; width: auto;
+                max-height: 85vh; border-radius: 0 0 8px 8px;
+            }
+            .control-panel.collapsed { max-height: none; }
+            .panel-header h3 { font-size: 0.95rem; }
+            #candidates-list { max-height: 45vh; }
+            .candidate-item { padding: 0.7rem; }
+            .candidate-item-name { font-size: 0.92rem; }
+            .candidate-item-price { font-size: 1rem; }
+            .leaflet-popup-content { font-size: 0.95rem; }
+        }
     </style>
 </head>
 <body>
@@ -143,8 +164,12 @@
     <div class="control-panel">
         <div class="panel-header">
             <h3>🗺 Búsqueda Sevilla</h3>
-            <button class="logout-btn" id="logout-btn">Salir</button>
+            <div style="display:flex; gap:0.4rem;">
+                <button class="logout-btn" id="toggle-panel-btn" style="background:#6c757d;">▲</button>
+                <button class="logout-btn" id="logout-btn">Salir</button>
+            </div>
         </div>
+        <div id="panel-body">
         
         <!-- Capas -->
         <div class="panel-section">
@@ -177,6 +202,7 @@
             <h4>🚫 Barrios descartados</h4>
             <div id="barrios-descartados-list"></div>
         </div>
+        </div><!-- /panel-body -->
     </div>
     
     <!-- Draw Bar -->
@@ -259,8 +285,8 @@
             barrio: { color: '#0066cc', weight: 1, fillColor: '#e6f2ff', fillOpacity: 0.25 },
             manual: { color: '#228B22', weight: 2, fillColor: '#90EE90', fillOpacity: 0.4 },
             descartada: { color: '#CC0000', weight: 2, fillColor: '#FF6B6B', fillOpacity: 0.35 },
-            ref: { radius: 8, fillColor: '#FF6B6B', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8 },
-            cand: { radius: 6, fillColor: '#FFD700', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8 }
+            ref: { radius: 9, fillColor: '#FF6B6B', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.9 },
+            cand: { radius: 10, fillColor: '#FFD700', color: '#333', weight: 2, opacity: 1, fillOpacity: 0.95 }
         };
         
         const REFS = [
@@ -501,6 +527,12 @@
             document.getElementById('draw-cancel').addEventListener('click', cancelDibujo);
             document.getElementById('draw-undo').addEventListener('click', undoDibujo);
             document.getElementById('import-json-btn').addEventListener('click', importarJSON);
+            document.getElementById('toggle-panel-btn').addEventListener('click', () => {
+                const panel = document.querySelector('.control-panel');
+                const btn = document.getElementById('toggle-panel-btn');
+                panel.classList.toggle('collapsed');
+                btn.textContent = panel.classList.contains('collapsed') ? '▼' : '▲';
+            });
             document.getElementById('add-piso-btn').addEventListener('click', nuevoCandidato);
             document.getElementById('save-cand-btn').addEventListener('click', saveCandidato);
             document.getElementById('close-modal-btn').addEventListener('click', closeModal);
@@ -518,41 +550,64 @@
                 const div = document.createElement('div');
                 div.className = 'candidate-item';
                 div.innerHTML = `
-                    <div class="candidate-item-header">
+                    <div class="candidate-item-header" onclick="window.toggleDetalle('${c.id}')" style="cursor:pointer;">
                         <span class="candidate-item-name">${c.nombre}</span>
                         <span class="candidate-item-price">${c.price ? c.price + '€' : '-'}</span>
                     </div>
-                    ${sub ? `<div style="font-size:0.75rem; color:#666; margin-top:2px;">${sub}</div>` : ''}
-                    <div class="candidate-item-actions">
-                        <button onclick="window.editarCandidato('${c.id}')">✎ Editar</button>
-                        <button onclick="window.eliminarCandidato('${c.id}')" class="btn-danger">🗑 Eliminar</button>
+                    ${sub ? `<div style="font-size:0.78rem; color:#666; margin-top:2px;">${sub} <span style="color:#0066cc;">· toca para ver ▾</span></div>` : `<div style="font-size:0.78rem; color:#0066cc; margin-top:2px;">toca para ver ▾</div>`}
+                    <div id="detalle-${c.id}" class="candidate-detalle" style="display:none;">
+                        ${d.planta ? `<div class="det-row">🏢 ${d.planta}</div>` : ''}
+                        ${d.notas ? `<div class="det-notas">📝 ${d.notas}</div>` : ''}
+                        ${c.url ? `<a href="${c.url}" target="_blank" rel="noopener" class="btn-ver-anuncio">🔗 Ver anuncio en Idealista ↗</a>` : '<div style="font-size:0.8rem; color:#999;">Sin enlace</div>'}
+                        <div class="candidate-item-actions">
+                            <button onclick="event.stopPropagation(); window.centrarEnMapa('${c.id}')">📍 Ver en mapa</button>
+                            <button onclick="event.stopPropagation(); window.editarCandidato('${c.id}')">✎ Editar</button>
+                            <button onclick="event.stopPropagation(); window.eliminarCandidato('${c.id}')" class="btn-danger">🗑</button>
+                        </div>
                     </div>
                 `;
                 list.appendChild(div);
             });
             renderCandidatosMap();
         }
+
+        window.toggleDetalle = function(id) {
+            const el = document.getElementById('detalle-' + id);
+            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        };
+
+        window.centrarEnMapa = function(id) {
+            const c = candidatos.find(x => x.id === id);
+            if (c && c.lat && c.lon) {
+                map.flyTo([c.lat, c.lon], 15, { duration: 0.8 });
+                const m = markersCandidatos[id];
+                if (m) setTimeout(() => m.openPopup(), 850);
+            }
+        };
         
+        let markersCandidatos = {};
         function renderCandidatosMap() {
             layerCandidatos.clearLayers();
+            markersCandidatos = {};
             candidatos.forEach(c => {
                 if (c.lat && c.lon) {
-                    const marker = L.circleMarker([c.lat, c.lon], ESTILOS.cand);
+                    // bubblingMouseEvents:false evita que el toque traspase al barrio de debajo
+                    const marker = L.circleMarker([c.lat, c.lon], { ...ESTILOS.cand, bubblingMouseEvents: false });
                     const d = c.detalles || {};
-                    let popup = `<div style="min-width:200px; max-width:260px; font-size:0.85rem; line-height:1.4;">`;
-                    popup += `<div style="font-weight:bold; font-size:0.95rem; margin-bottom:4px;">${c.nombre}</div>`;
-                    if (c.price) popup += `<div style="color:#0066cc; font-weight:bold; font-size:1.1rem;">${c.price} €/mes</div>`;
-                    // Línea de hab / m² / planta
+                    let popup = `<div style="min-width:200px; max-width:260px; font-size:0.9rem; line-height:1.4;">`;
+                    popup += `<div style="font-weight:bold; font-size:1rem; margin-bottom:4px;">${c.nombre}</div>`;
+                    if (c.price) popup += `<div style="color:#0066cc; font-weight:bold; font-size:1.15rem;">${c.price} €/mes</div>`;
                     let linea = [];
                     if (d.hab) linea.push(`🛏 ${d.hab} hab`);
                     if (d.m2) linea.push(`📐 ${d.m2} m²`);
                     if (linea.length) popup += `<div style="margin:4px 0;">${linea.join(' · ')}</div>`;
                     if (d.planta) popup += `<div style="color:#555; margin:2px 0;">🏢 ${d.planta}</div>`;
-                    if (d.notas) popup += `<div style="background:#f5f5f5; padding:5px; border-radius:4px; margin:6px 0; font-size:0.8rem;">📝 ${d.notas}</div>`;
-                    if (c.url) popup += `<a href="${c.url}" target="_blank" style="display:inline-block; margin-top:4px; background:#0066cc; color:white; padding:5px 10px; border-radius:4px; text-decoration:none; font-weight:bold;">Ver anuncio ↗</a>`;
+                    if (d.notas) popup += `<div style="background:#f5f5f5; padding:5px; border-radius:4px; margin:6px 0; font-size:0.82rem;">📝 ${d.notas}</div>`;
+                    if (c.url) popup += `<a href="${c.url}" target="_blank" rel="noopener" style="display:block; text-align:center; margin-top:6px; background:#0066cc; color:white; padding:9px; border-radius:6px; text-decoration:none; font-weight:bold;">Ver anuncio ↗</a>`;
                     popup += `</div>`;
-                    marker.bindPopup(popup);
+                    marker.bindPopup(popup, { maxWidth: 280 });
                     marker.addTo(layerCandidatos);
+                    markersCandidatos[c.id] = marker;
                 }
             });
         }
