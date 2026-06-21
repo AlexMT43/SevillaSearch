@@ -158,12 +158,10 @@
         <!-- Candidatos -->
         <div class="panel-section">
             <h4>🏠 Candidatos</h4>
-            <div style="margin-bottom: 0.5rem;">
-                <textarea id="csv-pisos" placeholder="Pega aquí tus pisos en formato CSV:&#10;Dirección, Precio, URL&#10;Calle ejemplo 1, 650, https://...&#10;Calle ejemplo 2, 750, https://...&#10;" style="width: 100%; height: 100px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 0.85rem;"></textarea>
-            </div>
-            <button class="btn-small" id="import-csv-btn">📥 Importar CSV</button>
+            <input type="file" id="file-json" accept=".json" style="width:100%; margin-bottom:0.5rem; font-size:0.85rem;" />
+            <button class="btn-small" id="import-json-btn">📥 Cargar pisos del archivo</button>
             <button class="btn-small" id="add-piso-btn" style="background:#28a745; margin-top: 0;">➕ Añadir piso a mano</button>
-            <div class="info-sync">Los cambios se sincronizan automáticamente</div>
+            <div class="info-sync">Los cambios se sincronizan automáticamente entre Alex y Ana</div>
             <div id="candidates-list"></div>
         </div>
         
@@ -502,7 +500,7 @@
             document.getElementById('draw-save').addEventListener('click', saveDibujo);
             document.getElementById('draw-cancel').addEventListener('click', cancelDibujo);
             document.getElementById('draw-undo').addEventListener('click', undoDibujo);
-            document.getElementById('import-csv-btn').addEventListener('click', importarCSV);
+            document.getElementById('import-json-btn').addEventListener('click', importarJSON);
             document.getElementById('add-piso-btn').addEventListener('click', nuevoCandidato);
             document.getElementById('save-cand-btn').addEventListener('click', saveCandidato);
             document.getElementById('close-modal-btn').addEventListener('click', closeModal);
@@ -515,6 +513,8 @@
             const list = document.getElementById('candidates-list');
             list.innerHTML = '';
             candidatos.forEach(c => {
+                const d = c.detalles || {};
+                const sub = [d.hab ? d.hab + 'h' : null, d.m2 ? d.m2 + 'm²' : null].filter(Boolean).join(' · ');
                 const div = document.createElement('div');
                 div.className = 'candidate-item';
                 div.innerHTML = `
@@ -522,6 +522,7 @@
                         <span class="candidate-item-name">${c.nombre}</span>
                         <span class="candidate-item-price">${c.price ? c.price + '€' : '-'}</span>
                     </div>
+                    ${sub ? `<div style="font-size:0.75rem; color:#666; margin-top:2px;">${sub}</div>` : ''}
                     <div class="candidate-item-actions">
                         <button onclick="window.editarCandidato('${c.id}')">✎ Editar</button>
                         <button onclick="window.eliminarCandidato('${c.id}')" class="btn-danger">🗑 Eliminar</button>
@@ -537,9 +538,19 @@
             candidatos.forEach(c => {
                 if (c.lat && c.lon) {
                     const marker = L.circleMarker([c.lat, c.lon], ESTILOS.cand);
-                    let popup = `<b>${c.nombre}</b><br>`;
-                    if (c.price) popup += `${c.price}€<br>`;
-                    if (c.url) popup += `<a href="${c.url}" target="_blank">Ver anuncio ↗</a>`;
+                    const d = c.detalles || {};
+                    let popup = `<div style="min-width:200px; max-width:260px; font-size:0.85rem; line-height:1.4;">`;
+                    popup += `<div style="font-weight:bold; font-size:0.95rem; margin-bottom:4px;">${c.nombre}</div>`;
+                    if (c.price) popup += `<div style="color:#0066cc; font-weight:bold; font-size:1.1rem;">${c.price} €/mes</div>`;
+                    // Línea de hab / m² / planta
+                    let linea = [];
+                    if (d.hab) linea.push(`🛏 ${d.hab} hab`);
+                    if (d.m2) linea.push(`📐 ${d.m2} m²`);
+                    if (linea.length) popup += `<div style="margin:4px 0;">${linea.join(' · ')}</div>`;
+                    if (d.planta) popup += `<div style="color:#555; margin:2px 0;">🏢 ${d.planta}</div>`;
+                    if (d.notas) popup += `<div style="background:#f5f5f5; padding:5px; border-radius:4px; margin:6px 0; font-size:0.8rem;">📝 ${d.notas}</div>`;
+                    if (c.url) popup += `<a href="${c.url}" target="_blank" style="display:inline-block; margin-top:4px; background:#0066cc; color:white; padding:5px 10px; border-radius:4px; text-decoration:none; font-weight:bold;">Ver anuncio ↗</a>`;
+                    popup += `</div>`;
                     marker.bindPopup(popup);
                     marker.addTo(layerCandidatos);
                 }
@@ -734,72 +745,90 @@
             currentCandidato = null;
         }
         
-        async function importarCSV() {
+        function leerArchivoJSON(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    try { resolve(JSON.parse(e.target.result)); }
+                    catch (err) { reject(new Error('El archivo no es un JSON válido')); }
+                };
+                reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+                reader.readAsText(file);
+            });
+        }
+
+        async function importarJSON() {
             try {
-                const csvText = document.getElementById('csv-pisos').value.trim();
-                
-                if (!csvText) {
-                    alert('❌ Pega datos CSV en el textarea primero');
+                const fileInput = document.getElementById('file-json');
+                const file = fileInput.files[0];
+
+                if (!file) {
+                    alert('❌ Selecciona primero el archivo de pisos (.json)');
                     return;
                 }
-                
-                console.log('📋 CSV recibido:', csvText.length, 'caracteres');
-                
-                const lineas = csvText.split('\n').filter(l => l.trim());
-                console.log('📊 Total de líneas:', lineas.length);
-                
-                let pisos = [];
-                
-                // Parsear CSV: esperamos "Dirección, Precio, URL" por línea
-                for (let i = 0; i < lineas.length; i++) {
-                    const linea = lineas[i];
-                    
-                    // Dividir por coma
-                    const partes = linea.split(',').map(p => p.trim());
-                    
-                    if (partes.length >= 2) {
-                        const direccion = partes[0];
-                        const precio = parseInt(partes[1].replace(/€/g, '').replace(/\./g, ''));
-                        const url = partes[2] || null;
-                        
-                        if (direccion && !isNaN(precio) && precio > 400 && precio < 1200) {
-                            pisos.push({ direccion, precio, url });
-                            console.log(`✅ Piso #${pisos.length}: ${precio}€ - ${direccion}`);
-                        } else {
-                            console.log(`⚠️ Línea inválida: "${linea}"`);
+
+                console.log('📂 Leyendo:', file.name);
+                const datos = await leerArchivoJSON(file);
+
+                if (!Array.isArray(datos)) {
+                    alert('❌ El archivo no contiene una lista de pisos');
+                    return;
+                }
+
+                console.log('📊 Pisos en el archivo:', datos.length);
+
+                // Cargar URLs ya existentes para no duplicar
+                const urlsExistentes = new Set(candidatos.filter(c => c.url).map(c => c.url));
+
+                let nuevos = 0, actualizados = 0;
+
+                for (let i = 0; i < datos.length; i++) {
+                    const p = datos[i];
+                    if (!p.lat || !p.lon) {
+                        console.log(`⚠️ Piso sin coordenadas, saltado: ${p.nombre}`);
+                        continue;
+                    }
+
+                    const registro = {
+                        nombre: p.nombre || 'Sin nombre',
+                        url: p.url || null,
+                        price: p.precio || null,
+                        lat: parseFloat(p.lat),
+                        lon: parseFloat(p.lon),
+                        detalles: {
+                            hab: p.hab || '',
+                            m2: p.m2 || '',
+                            planta: p.planta || '',
+                            notas: p.notas || '',
+                            zona: p.nombre || ''
                         }
+                    };
+
+                    if (p.url && urlsExistentes.has(p.url)) {
+                        // Ya existe → actualizar
+                        const { error } = await supabase.from('candidatos')
+                            .update(registro).eq('url', p.url);
+                        if (error) console.error('Error actualizando:', error);
+                        else { actualizados++; console.log(`🔄 Actualizado: ${p.nombre}`); }
+                    } else {
+                        // Nuevo → insertar
+                        registro.user_id = currentUser.id;
+                        const { error } = await supabase.from('candidatos').insert(registro);
+                        if (error) console.error('Error insertando:', error);
+                        else { nuevos++; console.log(`✅ Insertado: ${p.nombre}`); }
                     }
                 }
-                
-                console.log(`\n📊 Total de pisos válidos: ${pisos.length}`);
-                
-                if (pisos.length === 0) {
-                    alert('❌ No se encontraron pisos válidos\n\nFormato esperado:\nDirección, Precio, URL\n\nEjemplo:\nCalle Pez, 650, https://idealista.com/...\nPlaza Mayor, 750, https://idealista.com/...');
-                    return;
-                }
-                
-                alert(`✅ SE ENCONTRARON ${pisos.length} PISOS\n\nIniciando geocodificación...\n\nEspera 1-2 minutos (Nominatim es lento)...`);
-                console.log('🌍 Geocodificando...');
-                
-                for (let idx = 0; idx < pisos.length; idx++) {
-                    const piso = pisos[idx];
-                    console.log(`[${idx + 1}/${pisos.length}] Geocodificando: ${piso.precio}€ - ${piso.direccion}`);
-                    await geocodificarPiso(piso);
-                    await new Promise(r => setTimeout(r, 1200));
-                }
-                
-                alert(`✅ ¡LISTO!\n\nSe geocodificaron ${pisos.length} pisos.\n\nVe al mapa para verlos (círculos amarillos con precio).`);
-                
-                // Limpiar textarea
-                document.getElementById('csv-pisos').value = '';
-                console.log('✅ Importación completada');
-                
+
+                await loadCandidatos();
+
+                alert(`✅ ¡LISTO!\n\n🆕 Nuevos: ${nuevos}\n🔄 Actualizados: ${actualizados}\n\nLos pisos ya están en el mapa (puntos amarillos con el precio). Haz clic en cada uno para ver todos los detalles.`);
+                fileInput.value = '';
+
             } catch (error) {
-                console.error('❌ Error:', error);
+                console.error('❌ Error en importarJSON():', error);
                 alert(`❌ Error al importar:\n${error.message}`);
             }
         }
-        
 
         async function geocodificarPiso(piso) {
             const q = encodeURIComponent(piso.direccion + ', Sevilla, España');
