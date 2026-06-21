@@ -158,11 +158,11 @@
         <!-- Candidatos -->
         <div class="panel-section">
             <h4>🏠 Candidatos</h4>
-            <div class="input-group">
-                <input type="file" id="file-pisos" accept=".docx,.pdf,.txt,.csv" />
+            <div style="margin-bottom: 0.5rem;">
+                <textarea id="csv-pisos" placeholder="Pega aquí tus pisos en formato CSV:&#10;Dirección, Precio, URL&#10;Calle ejemplo 1, 650, https://...&#10;Calle ejemplo 2, 750, https://...&#10;" style="width: 100%; height: 100px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 0.85rem;"></textarea>
             </div>
-            <button class="btn-small" id="import-pisos-btn">📥 Importar pisos</button>
-            <button class="btn-small" id="add-piso-btn" style="background:#28a745;">➕ Añadir piso a mano</button>
+            <button class="btn-small" id="import-csv-btn">📥 Importar CSV</button>
+            <button class="btn-small" id="add-piso-btn" style="background:#28a745; margin-top: 0;">➕ Añadir piso a mano</button>
             <div class="info-sync">Los cambios se sincronizan automáticamente</div>
             <div id="candidates-list"></div>
         </div>
@@ -239,9 +239,7 @@
     
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/turf.js/6.5.0/turf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Scripts cargan al final -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0/+esm"></script>
     
     <script type="module">
@@ -504,7 +502,7 @@
             document.getElementById('draw-save').addEventListener('click', saveDibujo);
             document.getElementById('draw-cancel').addEventListener('click', cancelDibujo);
             document.getElementById('draw-undo').addEventListener('click', undoDibujo);
-            document.getElementById('import-pisos-btn').addEventListener('click', importarPisos);
+            document.getElementById('import-csv-btn').addEventListener('click', importarCSV);
             document.getElementById('add-piso-btn').addEventListener('click', nuevoCandidato);
             document.getElementById('save-cand-btn').addEventListener('click', saveCandidato);
             document.getElementById('close-modal-btn').addEventListener('click', closeModal);
@@ -736,63 +734,73 @@
             currentCandidato = null;
         }
         
-        async function importarPisos() {
-            const file = document.getElementById('file-pisos').files[0];
-            if (!file) { alert('Selecciona un archivo'); return; }
-            
-            let texto = '';
-            if (file.name.endsWith('.docx')) {
-                const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
-                texto = result.value;
-            } else if (file.name.endsWith('.pdf')) {
-                const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const content = await page.getTextContent();
-                    texto += content.items.map(it => it.str).join(' ');
+        async function importarCSV() {
+            try {
+                const csvText = document.getElementById('csv-pisos').value.trim();
+                
+                if (!csvText) {
+                    alert('❌ Pega datos CSV en el textarea primero');
+                    return;
                 }
-            } else {
-                texto = await file.text();
+                
+                console.log('📋 CSV recibido:', csvText.length, 'caracteres');
+                
+                const lineas = csvText.split('\n').filter(l => l.trim());
+                console.log('📊 Total de líneas:', lineas.length);
+                
+                let pisos = [];
+                
+                // Parsear CSV: esperamos "Dirección, Precio, URL" por línea
+                for (let i = 0; i < lineas.length; i++) {
+                    const linea = lineas[i];
+                    
+                    // Dividir por coma
+                    const partes = linea.split(',').map(p => p.trim());
+                    
+                    if (partes.length >= 2) {
+                        const direccion = partes[0];
+                        const precio = parseInt(partes[1].replace(/€/g, '').replace(/\./g, ''));
+                        const url = partes[2] || null;
+                        
+                        if (direccion && !isNaN(precio) && precio > 400 && precio < 1200) {
+                            pisos.push({ direccion, precio, url });
+                            console.log(`✅ Piso #${pisos.length}: ${precio}€ - ${direccion}`);
+                        } else {
+                            console.log(`⚠️ Línea inválida: "${linea}"`);
+                        }
+                    }
+                }
+                
+                console.log(`\n📊 Total de pisos válidos: ${pisos.length}`);
+                
+                if (pisos.length === 0) {
+                    alert('❌ No se encontraron pisos válidos\n\nFormato esperado:\nDirección, Precio, URL\n\nEjemplo:\nCalle Pez, 650, https://idealista.com/...\nPlaza Mayor, 750, https://idealista.com/...');
+                    return;
+                }
+                
+                alert(`✅ SE ENCONTRARON ${pisos.length} PISOS\n\nIniciando geocodificación...\n\nEspera 1-2 minutos (Nominatim es lento)...`);
+                console.log('🌍 Geocodificando...');
+                
+                for (let idx = 0; idx < pisos.length; idx++) {
+                    const piso = pisos[idx];
+                    console.log(`[${idx + 1}/${pisos.length}] Geocodificando: ${piso.precio}€ - ${piso.direccion}`);
+                    await geocodificarPiso(piso);
+                    await new Promise(r => setTimeout(r, 1200));
+                }
+                
+                alert(`✅ ¡LISTO!\n\nSe geocodificaron ${pisos.length} pisos.\n\nVe al mapa para verlos (círculos amarillos con precio).`);
+                
+                // Limpiar textarea
+                document.getElementById('csv-pisos').value = '';
+                console.log('✅ Importación completada');
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                alert(`❌ Error al importar:\n${error.message}`);
             }
-            
-            await parsearYGeocificarPisos(texto);
         }
         
-        async function parsearYGeocificarPisos(texto) {
-            const reDir = /\b(?:calle|c\/|c\.|avenida|avda|av|plaza|pza|paseo|camino|carretera|ctra|ronda|barriada|bda|urbanización|urb)\.?\s+[a-záéíóúüñ''\\-]+(?:\s+[a-záéíóúüñ''\\-]+){0,4}(?:\s*,?\s*(?:n[ºo°]?\s*)?(\d{1,4}))?/gi;
-            const rePrecio = /(\d+(?:\.\d{3})*|\d+)\s*€/g;
-            const reUrl = /https?:\/\/[^\s]+/g;
-            const reFoto = /https?:\/\/[^\s]*\.(?:jpg|jpeg|png|gif|webp)/gi;
-            
-            let pisos = [];
-            let match;
-            
-            while ((match = reDir.exec(texto)) !== null) {
-                const dir = match[0];
-                const ini = match.index;
-                const ventana = texto.slice(Math.max(0, ini - 100), ini + 150);
-                
-                let precio = null;
-                let precioMatch = rePrecio.exec(ventana);
-                if (precioMatch) precio = parseInt(precioMatch[1].replace(/\./g, ''));
-                
-                let url = null;
-                let urlMatch = reUrl.exec(ventana);
-                if (urlMatch) url = urlMatch[0];
-                
-                let foto = null;
-                let fotoMatch = reFoto.exec(ventana);
-                if (fotoMatch) foto = fotoMatch[0];
-                
-                pisos.push({ direccion: dir, precio, url, foto });
-            }
-            
-            for (const piso of pisos.slice(0, 30)) {
-                await geocodificarPiso(piso);
-                await new Promise(r => setTimeout(r, 1200));
-            }
-        }
-        
+
         async function geocodificarPiso(piso) {
             const q = encodeURIComponent(piso.direccion + ', Sevilla, España');
             try {
