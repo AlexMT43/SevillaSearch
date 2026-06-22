@@ -64,8 +64,10 @@
         .candidate-detalle { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #ccc; }
         .det-row { font-size: 0.82rem; color: #555; margin-bottom: 4px; }
         .det-notas { font-size: 0.8rem; background: #fff8e1; padding: 6px 8px; border-radius: 4px; margin-bottom: 8px; line-height: 1.35; }
-        .btn-ver-anuncio { display: block; text-align: center; background: #ff6600; color: white; padding: 11px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 0.9rem; margin-bottom: 6px; }
-        .btn-ver-anuncio:active { background: #cc5200; }
+        .btn-estrella { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 0.3rem 0.5rem; }
+        .btn-estrella:active { transform: scale(1.15); }
+        .candidate-item.favorite { background: #fff8dc; border-left: 4px solid #FFD700; }
+        .candidate-item.favorite .candidate-item-name { color: #FF8C00; }
         
         #zonas-list { max-height: 250px; overflow-y: auto; font-size: 0.85rem; }
         .zona-item { padding: 0.5rem; background: #f5f5f5; margin-bottom: 0.5rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
@@ -547,12 +549,16 @@
             candidatos.forEach(c => {
                 const d = c.detalles || {};
                 const sub = [d.hab ? d.hab + 'h' : null, d.m2 ? d.m2 + 'm²' : null].filter(Boolean).join(' · ');
+                const estrella = c.favorito ? '⭐' : '☆';
                 const div = document.createElement('div');
-                div.className = 'candidate-item';
+                div.className = 'candidate-item' + (c.favorito ? ' favorite' : '');
                 div.innerHTML = `
-                    <div class="candidate-item-header" onclick="window.toggleDetalle('${c.id}')" style="cursor:pointer;">
-                        <span class="candidate-item-name">${c.nombre}</span>
-                        <span class="candidate-item-price">${c.price ? c.price + '€' : '-'}</span>
+                    <div class="candidate-item-header" onclick="window.toggleDetalle('${c.id}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; width:100%;">
+                        <div style="flex:1;">
+                            <span class="candidate-item-name">${c.nombre}</span>
+                            <span class="candidate-item-price">${c.price ? c.price + '€' : '-'}</span>
+                        </div>
+                        <button onclick="event.stopPropagation(); window.toggleFavorito('${c.id}')" class="btn-estrella">${estrella}</button>
                     </div>
                     ${sub ? `<div style="font-size:0.78rem; color:#666; margin-top:2px;">${sub} <span style="color:#0066cc;">· toca para ver ▾</span></div>` : `<div style="font-size:0.78rem; color:#0066cc; margin-top:2px;">toca para ver ▾</div>`}
                     <div id="detalle-${c.id}" class="candidate-detalle" style="display:none;">
@@ -570,6 +576,21 @@
             });
             renderCandidatosMap();
         }
+
+        window.toggleFavorito = async function(id) {
+            const c = candidatos.find(x => x.id === id);
+            if (!c) return;
+            
+            const nuevo = !c.favorito;
+            const { error } = await supabase.from('candidatos')
+                .update({ favorito: nuevo })
+                .eq('id', id);
+            
+            if (!error) {
+                console.log(`⭐ ${nuevo ? 'Marcado' : 'Desmarcado'}: ${c.nombre}`);
+                await loadCandidatos();
+            }
+        };
 
         window.toggleDetalle = function(id) {
             const el = document.getElementById('detalle-' + id);
@@ -591,11 +612,15 @@
             markersCandidatos = {};
             candidatos.forEach(c => {
                 if (c.lat && c.lon) {
-                    // bubblingMouseEvents:false evita que el toque traspase al barrio de debajo
-                    const marker = L.circleMarker([c.lat, c.lon], { ...ESTILOS.cand, bubblingMouseEvents: false });
+                    // Cambiar estilo si es favorito (amarillo/dorado) o normal (rojo)
+                    const estilo = c.favorito 
+                        ? { radius: 11, fillColor: '#FFD700', color: '#fff', weight: 3, opacity: 1, fillOpacity: 0.95 }
+                        : { radius: 10, fillColor: '#FF4444', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.95 };
+                    
+                    const marker = L.circleMarker([c.lat, c.lon], { ...estilo, bubblingMouseEvents: false });
                     const d = c.detalles || {};
                     let popup = `<div style="min-width:200px; max-width:260px; font-size:0.9rem; line-height:1.4;">`;
-                    popup += `<div style="font-weight:bold; font-size:1rem; margin-bottom:4px;">${c.nombre}</div>`;
+                    popup += `<div style="font-weight:bold; font-size:1rem; margin-bottom:4px;">${c.nombre}${c.favorito ? ' ⭐' : ''}</div>`;
                     if (c.price) popup += `<div style="color:#0066cc; font-weight:bold; font-size:1.15rem;">${c.price} €/mes</div>`;
                     let linea = [];
                     if (d.hab) linea.push(`🛏 ${d.hab} hab`);
@@ -825,20 +850,48 @@
                 console.log('📂 Leyendo:', file.name);
                 const datos = await leerArchivoJSON(file);
 
-                if (!Array.isArray(datos)) {
-                    alert('❌ El archivo no contiene una lista de pisos');
+                // Estructura nueva: { pisos: [...], eliminados: [...] }
+                // Si es un array directo (viejo formato), convertir
+                let pisos, eliminados = [];
+                if (Array.isArray(datos)) {
+                    pisos = datos;
+                } else if (datos.pisos && Array.isArray(datos.pisos)) {
+                    pisos = datos.pisos;
+                    eliminados = datos.eliminados || [];
+                } else {
+                    alert('❌ El archivo no contiene una estructura válida (esperado: { pisos: [...], eliminados: [...] })');
                     return;
                 }
 
-                console.log('📊 Pisos en el archivo:', datos.length);
+                console.log('📊 Pisos en el archivo:', pisos.length);
+                console.log('🗑 Pisos a eliminar:', eliminados.length);
+                if (eliminados.length) {
+                    console.log('URLs de eliminados:', eliminados.slice(0, 3).join(', ') + (eliminados.length > 3 ? '...' : ''));
+                }
 
+                // ====== FASE 1: ELIMINAR PISOS OBSOLETOS ======
+                let deletedCount = 0;
+                for (const url of eliminados) {
+                    const { error } = await supabase.from('candidatos')
+                        .delete()
+                        .eq('url', url);
+                    if (!error) {
+                        deletedCount++;
+                        console.log(`🗑 Eliminado de BD: ${url}`);
+                    }
+                }
+                if (deletedCount > 0) {
+                    console.log(`✅ ${deletedCount} pisos obsoletos borrados de la BD`);
+                }
+
+                // ====== FASE 2: CARGAR PISOS NUEVOS/ACTUALIZADOS ======
                 // Cargar URLs ya existentes para no duplicar
                 const urlsExistentes = new Set(candidatos.filter(c => c.url).map(c => c.url));
 
                 let nuevos = 0, actualizados = 0;
 
-                for (let i = 0; i < datos.length; i++) {
-                    const p = datos[i];
+                for (let i = 0; i < pisos.length; i++) {
+                    const p = pisos[i];
                     if (!p.lat || !p.lon) {
                         console.log(`⚠️ Piso sin coordenadas, saltado: ${p.nombre}`);
                         continue;
@@ -860,7 +913,10 @@
                     };
 
                     if (p.url && urlsExistentes.has(p.url)) {
-                        // Ya existe → actualizar
+                        // Ya existe → actualizar, pero preservar favorito
+                        const pisoExistente = candidatos.find(c => c.url === p.url);
+                        const favorito = pisoExistente ? pisoExistente.favorito : false;
+                        registro.favorito = favorito;  // ← Preservar
                         const { error } = await supabase.from('candidatos')
                             .update(registro).eq('url', p.url);
                         if (error) console.error('Error actualizando:', error);
@@ -876,7 +932,9 @@
 
                 await loadCandidatos();
 
-                alert(`✅ ¡LISTO!\n\n🆕 Nuevos: ${nuevos}\n🔄 Actualizados: ${actualizados}\n\nLos pisos ya están en el mapa (puntos amarillos con el precio). Haz clic en cada uno para ver todos los detalles.`);
+                // Mensaje final con el resumen completo
+                const msg = `✅ ¡LISTO!\n\n🆕 Nuevos: ${nuevos}\n🔄 Actualizados: ${actualizados}\n🗑 Eliminados: ${deletedCount}\n\nEl mapa se ha actualizado. Los pisos obsoletos han desaparecido.`;
+                alert(msg);
                 fileInput.value = '';
 
             } catch (error) {
