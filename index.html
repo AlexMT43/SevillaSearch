@@ -68,6 +68,11 @@
         .btn-estrella:active { transform: scale(1.15); }
         .candidate-item.favorite { background: #fff8dc; border-left: 4px solid #FFD700; }
         .candidate-item.favorite .candidate-item-name { color: #FF8C00; }
+        .btn-descarte { background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 0.3rem 0.4rem; opacity: 0.6; }
+        .btn-descarte:active { transform: scale(1.15); }
+        .btn-descarte.activo { opacity: 1; }
+        .candidate-item.descartado { background: #f0f0f0; border-left: 4px solid #999; opacity: 0.7; }
+        .candidate-item.descartado .candidate-item-name { color: #888; text-decoration: line-through; }
         
         #zonas-list { max-height: 250px; overflow-y: auto; font-size: 0.85rem; }
         .zona-item { padding: 0.5rem; background: #f5f5f5; margin-bottom: 0.5rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
@@ -247,7 +252,15 @@
     <div class="leyenda">
         <div class="leyenda-item">
             <div class="leyenda-color" style="background: #FFD700;"></div>
-            <span>Candidatos (tu cuenta)</span>
+            <span>Favoritos ⭐</span>
+        </div>
+        <div class="leyenda-item">
+            <div class="leyenda-color" style="background: #FF4444;"></div>
+            <span>Pisos normales</span>
+        </div>
+        <div class="leyenda-item">
+            <div style="font-size:18px; color:#777; font-weight:bold; width:20px; text-align:center;">✕</div>
+            <span>Descartados ❌</span>
         </div>
         <div class="leyenda-item">
             <div class="leyenda-color" style="background: #90EE90;"></div>
@@ -255,11 +268,7 @@
         </div>
         <div class="leyenda-item">
             <div class="leyenda-color" style="background: #FF6B6B;"></div>
-            <span>Zonas descartadas</span>
-        </div>
-        <div class="leyenda-item">
-            <div class="leyenda-color" style="background: #FF6B6B;"></div>
-            <span>Barrios descartados (click)</span>
+            <span>Barrios descartados</span>
         </div>
     </div>
     
@@ -551,14 +560,15 @@
                 const sub = [d.hab ? d.hab + 'h' : null, d.m2 ? d.m2 + 'm²' : null].filter(Boolean).join(' · ');
                 const estrella = c.favorito ? '⭐' : '☆';
                 const div = document.createElement('div');
-                div.className = 'candidate-item' + (c.favorito ? ' favorite' : '');
+                div.className = 'candidate-item' + (c.favorito ? ' favorite' : '') + (c.descartado ? ' descartado' : '');
                 div.innerHTML = `
                     <div class="candidate-item-header" onclick="window.toggleDetalle('${c.id}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; width:100%;">
                         <div style="flex:1;">
                             <span class="candidate-item-name">${c.nombre}</span>
                             <span class="candidate-item-price">${c.price ? c.price + '€' : '-'}</span>
                         </div>
-                        <button onclick="event.stopPropagation(); window.toggleFavorito('${c.id}')" class="btn-estrella">${estrella}</button>
+                        <button onclick="event.stopPropagation(); window.toggleFavorito('${c.id}')" class="btn-estrella" title="Favorito">${estrella}</button>
+                        <button onclick="event.stopPropagation(); window.toggleDescartado('${c.id}')" class="btn-descarte${c.descartado ? ' activo' : ''}" title="Descartar">${c.descartado ? '❌' : '✕'}</button>
                     </div>
                     ${sub ? `<div style="font-size:0.78rem; color:#666; margin-top:2px;">${sub} <span style="color:#0066cc;">· toca para ver ▾</span></div>` : `<div style="font-size:0.78rem; color:#0066cc; margin-top:2px;">toca para ver ▾</div>`}
                     <div id="detalle-${c.id}" class="candidate-detalle" style="display:none;">
@@ -582,12 +592,29 @@
             if (!c) return;
             
             const nuevo = !c.favorito;
+            // Favorito y descartado son excluyentes: marcar favorito quita descarte
             const { error } = await supabase.from('candidatos')
-                .update({ favorito: nuevo })
+                .update({ favorito: nuevo, descartado: nuevo ? false : c.descartado })
                 .eq('id', id);
             
             if (!error) {
                 console.log(`⭐ ${nuevo ? 'Marcado' : 'Desmarcado'}: ${c.nombre}`);
+                await loadCandidatos();
+            }
+        };
+
+        window.toggleDescartado = async function(id) {
+            const c = candidatos.find(x => x.id === id);
+            if (!c) return;
+            
+            const nuevo = !c.descartado;
+            // Descartar quita favorito (no tiene sentido un favorito descartado)
+            const { error } = await supabase.from('candidatos')
+                .update({ descartado: nuevo, favorito: nuevo ? false : c.favorito })
+                .eq('id', id);
+            
+            if (!error) {
+                console.log(`❌ ${nuevo ? 'Descartado' : 'Recuperado'}: ${c.nombre}`);
                 await loadCandidatos();
             }
         };
@@ -612,15 +639,26 @@
             markersCandidatos = {};
             candidatos.forEach(c => {
                 if (c.lat && c.lon) {
-                    // Cambiar estilo si es favorito (amarillo/dorado) o normal (rojo)
-                    const estilo = c.favorito 
-                        ? { radius: 11, fillColor: '#FFD700', color: '#fff', weight: 3, opacity: 1, fillOpacity: 0.95 }
-                        : { radius: 10, fillColor: '#FF4444', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.95 };
-                    
-                    const marker = L.circleMarker([c.lat, c.lon], { ...estilo, bubblingMouseEvents: false });
+                    let marker;
+                    if (c.descartado) {
+                        // Descartado → cruz gris (divIcon) en vez de círculo
+                        const icono = L.divIcon({
+                            className: 'marcador-descartado',
+                            html: '<div style="font-size:22px; font-weight:bold; color:#777; text-shadow:0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; line-height:1;">✕</div>',
+                            iconSize: [22, 22],
+                            iconAnchor: [11, 11]
+                        });
+                        marker = L.marker([c.lat, c.lon], { icon: icono, bubblingMouseEvents: false });
+                    } else {
+                        // Favorito (amarillo) o normal (rojo)
+                        const estilo = c.favorito 
+                            ? { radius: 11, fillColor: '#FFD700', color: '#fff', weight: 3, opacity: 1, fillOpacity: 0.95 }
+                            : { radius: 10, fillColor: '#FF4444', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.95 };
+                        marker = L.circleMarker([c.lat, c.lon], { ...estilo, bubblingMouseEvents: false });
+                    }
                     const d = c.detalles || {};
                     let popup = `<div style="min-width:200px; max-width:260px; font-size:0.9rem; line-height:1.4;">`;
-                    popup += `<div style="font-weight:bold; font-size:1rem; margin-bottom:4px;">${c.nombre}${c.favorito ? ' ⭐' : ''}</div>`;
+                    popup += `<div style="font-weight:bold; font-size:1rem; margin-bottom:4px;">${c.nombre}${c.favorito ? ' ⭐' : ''}${c.descartado ? ' ❌' : ''}</div>`;
                     if (c.price) popup += `<div style="color:#0066cc; font-weight:bold; font-size:1.15rem;">${c.price} €/mes</div>`;
                     let linea = [];
                     if (d.hab) linea.push(`🛏 ${d.hab} hab`);
@@ -777,7 +815,9 @@
                 nombre,
                 url: document.getElementById('cand-url').value || null,
                 price: parseInt(document.getElementById('cand-price').value) || null,
-                foto: document.getElementById('cand-foto').value || null
+                foto: document.getElementById('cand-foto').value || null,
+                favorito: false,
+                descartado: false
             };
             
             // Si han escrito dirección, geocodificar para situarlo en el mapa
@@ -903,6 +943,8 @@
                         price: p.precio || null,
                         lat: parseFloat(p.lat),
                         lon: parseFloat(p.lon),
+                        favorito: false,
+                        descartado: false,
                         detalles: {
                             hab: p.hab || '',
                             m2: p.m2 || '',
@@ -913,10 +955,10 @@
                     };
 
                     if (p.url && urlsExistentes.has(p.url)) {
-                        // Ya existe → actualizar, pero preservar favorito
+                        // Ya existe → actualizar, pero preservar favorito y descartado
                         const pisoExistente = candidatos.find(c => c.url === p.url);
-                        const favorito = pisoExistente ? pisoExistente.favorito : false;
-                        registro.favorito = favorito;  // ← Preservar
+                        registro.favorito = pisoExistente ? pisoExistente.favorito : false;
+                        registro.descartado = pisoExistente ? pisoExistente.descartado : false;
                         const { error } = await supabase.from('candidatos')
                             .update(registro).eq('url', p.url);
                         if (error) console.error('Error actualizando:', error);
@@ -958,7 +1000,9 @@
                     price: piso.precio,
                     foto: piso.foto,
                     lat: parseFloat(lat),
-                    lon: parseFloat(lon)
+                    lon: parseFloat(lon),
+                    favorito: false,
+                    descartado: false
                 });
                 
                 if (!error) await loadCandidatos();
