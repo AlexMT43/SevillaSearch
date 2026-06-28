@@ -71,9 +71,10 @@
         .btn-descarte { background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 0.3rem 0.4rem; opacity: 0.6; }
         .btn-descarte:active { transform: scale(1.15); }
 
-        .btn-visto { background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 0.3rem 0.4rem; opacity: 0.4; }
+        .btn-visto { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 0.3rem 0.4rem; opacity: 0.5; transition: all 0.2s; }
+        .btn-visto:hover { opacity: 0.8; }
         .btn-visto:active { transform: scale(1.15); }
-        .btn-visto.activo { opacity: 1; }
+        .btn-visto.activo { opacity: 1; color: #0066cc; }
         .btn-descarte.activo { opacity: 1; }
         .candidate-item.descartado { background: #f0f0f0; border-left: 4px solid #999; opacity: 0.7; }
         .candidate-item.descartado .candidate-item-name { color: #888; text-decoration: line-through; }
@@ -605,7 +606,7 @@
                         </div>
                         <button onclick="event.stopPropagation(); window.toggleFavorito('${c.id}')" class="btn-estrella" title="Favorito">${estrella}</button>
                         <button onclick="event.stopPropagation(); window.toggleDescartado('${c.id}')" class="btn-descarte${c.descartado ? ' activo' : ''}" title="Descartar">${c.descartado ? '❌' : '✕'}</button>
-                        <button onclick="event.stopPropagation(); window.toggleVisto('${c.id}')" class="btn-visto${c.visto ? ' activo' : ''}" title="Marcar como visto">${c.visto ? '👁️' : '·'}</button>
+                        <button onclick="event.stopPropagation(); window.toggleVisto('${c.id}')" class="btn-visto${c.visto ? ' activo' : ''}" title="Marcar como visto">${c.visto ? '👁️' : '◯'}</button>
                     </div>
                     ${sub ? `<div style="font-size:0.78rem; color:#666; margin-top:2px;">${sub} <span style="color:#0066cc;">· toca para ver ▾</span></div>` : `<div style="font-size:0.78rem; color:#0066cc; margin-top:2px;">toca para ver ▾</div>`}
                     <div id="detalle-${c.id}" class="candidate-detalle" style="display:none;">
