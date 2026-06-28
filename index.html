@@ -3,1024 +3,694 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Búsqueda Sevilla - Colaborativo</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <title>SevillaSearch - Búsqueda de Pisos GIS</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        
-        #map { width: 100%; height: 100%; }
-        
-        /* Modal login */
-        #login-modal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); display: none; z-index: 999;
-            justify-content: center; align-items: center;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        #login-modal.show { display: flex; }
-        #login-box {
-            background: white; padding: 2rem; border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2); width: 90%; max-width: 400px;
-        }
-        #login-box h2 { margin-bottom: 1.5rem; }
-        #login-box input { width: 100%; padding: 0.75rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; }
-        #login-box button { width: 100%; padding: 0.75rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 0.5rem; }
-        #login-box button:hover { background: #0052a3; }
-        #login-box .toggle-btn { background: #666; }
-        #login-box .toggle-btn:hover { background: #444; }
-        #login-msg { color: red; margin-bottom: 1rem; font-size: 0.9rem; }
-        
-        /* Controls panel */
-        .control-panel {
-            position: fixed; top: 10px; right: 10px; background: white;
-            border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            z-index: 500; max-height: 80vh; overflow-y: auto; width: 320px;
-        }
-        .panel-header { padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .panel-header h3 { font-size: 1rem; }
-        .logout-btn { background: #dc3545; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
-        .panel-section { padding: 1rem; border-bottom: 1px solid #eee; }
-        .panel-section h4 { font-size: 0.9rem; margin-bottom: 0.5rem; color: #333; }
-        
-        .input-group { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
-        .input-group input, .input-group select { flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
-        .input-group button { padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
-        .input-group button:hover { background: #0052a3; }
-        
-        .btn-small { padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; width: 100%; margin-bottom: 0.5rem; }
-        .btn-small:hover { background: #0052a3; }
-        .btn-danger { background: #dc3545; }
-        .btn-danger:hover { background: #c82333; }
-        .btn-success { background: #28a745; color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 3px; cursor: pointer; font-size: 0.85rem; }
-        .btn-success:hover { background: #218838; }
-        
-        #candidates-list { max-height: 300px; overflow-y: auto; font-size: 0.85rem; }
-        .candidate-item { padding: 0.5rem; background: #f5f5f5; margin-bottom: 0.5rem; border-radius: 4px; }
-        .candidate-item-header { display: flex; justify-content: space-between; align-items: center; }
-        .candidate-item-name { font-weight: bold; }
-        .candidate-item-price { color: #0066cc; font-weight: bold; }
-        .candidate-item-actions { display: flex; gap: 0.3rem; margin-top: 0.5rem; }
-        .candidate-item-actions button { padding: 0.5rem 0.4rem; font-size: 0.78rem; flex: 1; border:none; border-radius:4px; background:#0066cc; color:white; cursor:pointer; }
-        .candidate-detalle { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #ccc; }
-        .det-row { font-size: 0.82rem; color: #555; margin-bottom: 4px; }
-        .det-notas { font-size: 0.8rem; background: #fff8e1; padding: 6px 8px; border-radius: 4px; margin-bottom: 8px; line-height: 1.35; }
-        .btn-estrella { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 0.3rem 0.5rem; }
-        .btn-estrella:active { transform: scale(1.15); }
-        .candidate-item.favorite { background: #fff8dc; border-left: 4px solid #FFD700; }
-        .candidate-item.favorite .candidate-item-name { color: #FF8C00; }
-        .btn-descarte { background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 0.3rem 0.4rem; opacity: 0.6; }
-        .btn-descarte:active { transform: scale(1.15); }
-        .btn-descarte.activo { opacity: 1; }
-        .candidate-item.descartado { background: #f0f0f0; border-left: 4px solid #999; opacity: 0.7; }
-        .candidate-item.descartado .candidate-item-name { color: #888; text-decoration: line-through; }
-        
-        #zonas-list { max-height: 250px; overflow-y: auto; font-size: 0.85rem; }
-        .zona-item { padding: 0.5rem; background: #f5f5f5; margin-bottom: 0.5rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
-        
-        /* Modal candidato */
-        #candidate-modal {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: white; padding: 1.5rem; border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.3); z-index: 1000;
-            display: none; width: 90%; max-width: 450px;
-        }
-        #candidate-modal.show { display: block; }
-        #candidate-modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.3); z-index: 999; display: none;
-        }
-        #candidate-modal-overlay.show { display: block; }
-        #candidate-modal input, #candidate-modal textarea { width: 100%; padding: 0.5rem; margin-bottom: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
-        #candidate-modal label { font-weight: bold; font-size: 0.9rem; display: block; margin-top: 0.5rem; }
-        #candidate-modal-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
-        #candidate-modal-actions button { flex: 1; padding: 0.5rem; border: none; border-radius: 4px; cursor: pointer; }
-        .modal-save { background: #28a745; color: white; }
-        .modal-save:hover { background: #218838; }
-        .modal-close { background: #6c757d; color: white; }
-        .modal-close:hover { background: #5a6268; }
-        
-        /* Draw bar */
-        #draw-bar {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: white; padding: 1rem; border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 500;
-            display: none; gap: 1rem; align-items: center;
-        }
-        #draw-bar.show { display: flex; }
-        #draw-info { font-size: 0.9rem; min-width: 200px; }
-        #draw-bar button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
-        #draw-undo { background: #ffc107; color: black; }
-        #draw-save { background: #28a745; color: white; }
-        #draw-cancel { background: #dc3545; color: white; }
-        
-        /* Leyenda */
-        .leyenda {
-            position: fixed; bottom: 20px; right: 20px; background: white;
-            padding: 1rem; border-radius: 8px; font-size: 0.85rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 300;
-        }
-        .leyenda-item { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
-        .leyenda-color { width: 20px; height: 20px; border-radius: 3px; }
-        
-        .info-sync { font-size: 0.75rem; color: #666; margin-top: 0.5rem; }
-        .control-panel.collapsed #panel-body { display: none; }
 
-        /* Móvil */
-        @media (max-width: 600px) {
-            .control-panel {
-                top: 0; right: 0; left: 0; width: auto;
-                max-height: 85vh; border-radius: 0 0 8px 8px;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+            min-width: 0;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .sidebar {
+            width: 380px;
+            background: white;
+            border-left: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 15px;
+            border-bottom: 2px solid #f0f0f0;
+            background: #fafafa;
+        }
+
+        .sidebar-header h2 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .sort-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sort-group label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #555;
+            min-width: 60px;
+        }
+
+        .sort-group select,
+        .sort-group button {
+            flex: 1;
+            padding: 7px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sort-group select:hover,
+        .sort-group button:hover {
+            border-color: #999;
+            background: #f9f9f9;
+        }
+
+        .sort-group button {
+            padding: 7px;
+            min-width: 30px;
+            font-weight: bold;
+            color: #666;
+        }
+
+        .sort-group button.active {
+            background: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .piso-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .piso-card:hover {
+            border-color: #999;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .piso-card.visto {
+            background: #f0f0f0;
+            opacity: 0.7;
+            text-decoration: line-through;
+        }
+
+        .piso-card.favorito {
+            background: #fffbea;
+            border-color: #ffc107;
+        }
+
+        .piso-card.descartado {
+            background: #f8f8f8;
+            opacity: 0.5;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .card-checkbox {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            margin-top: 2px;
+            cursor: pointer;
+            accent-color: #28a745;
+        }
+
+        .card-number {
+            font-weight: bold;
+            color: #007bff;
+            font-size: 14px;
+            min-width: 30px;
+        }
+
+        .card-title {
+            flex: 1;
+            font-weight: 600;
+            color: #333;
+            font-size: 13px;
+            word-break: break-word;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 5px;
+            margin-left: auto;
+        }
+
+        .action-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 4px;
+            background: #f0f0f0;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .action-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .action-btn.favorito {
+            background: #fff3cd;
+            color: #ffc107;
+        }
+
+        .action-btn.descartado {
+            background: #f8d7da;
+            color: #dc3545;
+        }
+
+        .card-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 12px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .info-label {
+            color: #888;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .card-link {
+            display: block;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+            font-size: 11px;
+            color: #007bff;
+            text-decoration: none;
+            word-break: break-all;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .card-link:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+
+        .card-notas {
+            font-size: 11px;
+            color: #666;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+            line-height: 1.3;
+        }
+
+        .toggle-btn {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
             }
-            .control-panel.collapsed { max-height: none; }
-            .panel-header h3 { font-size: 0.95rem; }
-            #candidates-list { max-height: 45vh; }
-            .candidate-item { padding: 0.7rem; }
-            .candidate-item-name { font-size: 0.92rem; }
-            .candidate-item-price { font-size: 1rem; }
-            .leaflet-popup-content { font-size: 0.95rem; }
+
+            .sidebar {
+                width: 100%;
+                height: 250px;
+                border-left: none;
+                border-top: 1px solid #ddd;
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 900;
+            }
+
+            .sidebar.collapsed {
+                height: 45px;
+            }
+
+            .sidebar.collapsed .sidebar-content,
+            .sidebar.collapsed .sidebar-header > *:not(:first-child) {
+                display: none;
+            }
+
+            .map-container {
+                height: 100%;
+            }
+
+            .toggle-btn {
+                display: block;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .stats {
+            font-size: 12px;
+            color: #888;
+            padding: 10px;
+            background: #f9f9f9;
+            border-top: 1px solid #eee;
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
-    <div id="map"></div>
-    
-    <!-- Login Modal -->
-    <div id="login-modal" class="show">
-        <div id="login-box">
-            <h2>🗺 Búsqueda Sevilla</h2>
-            <div id="login-msg"></div>
-            <div id="login-form">
-                <h3 style="font-size: 0.95rem; margin-bottom: 1rem;">Entra o regístrate</h3>
-                <input type="email" id="email" placeholder="Tu email" />
-                <input type="password" id="password" placeholder="Contraseña" />
-                <button id="login-btn">Entrar</button>
-                <button class="toggle-btn" id="toggle-signup">¿Sin cuenta? Registrarse aquí</button>
+    <div class="container">
+        <div class="map-container">
+            <div id="map"></div>
+            <button class="toggle-btn" id="toggleSidebar">▲</button>
+        </div>
+
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>🏠 SevillaSearch</h2>
+                <div class="controls">
+                    <div class="sort-group">
+                        <label>Ordenar:</label>
+                        <select id="sortBy">
+                            <option value="favorito">⭐ Favoritos primero</option>
+                            <option value="precio_asc">💶 Precio (menor)</option>
+                            <option value="precio_desc">💶 Precio (mayor)</option>
+                            <option value="distancia">📍 Distancia</option>
+                            <option value="fecha_desc">📅 Más recientes</option>
+                            <option value="fecha_asc">📅 Más antiguos</option>
+                            <option value="estado">👁️ No vistos primero</option>
+                        </select>
+                    </div>
+                    <div class="sort-group">
+                        <button id="importBtn">📥 Importar JSON</button>
+                        <button id="exportBtn">📤 Exportar</button>
+                    </div>
+                </div>
             </div>
-            <div id="signup-form" style="display:none;">
-                <h3 style="font-size: 0.95rem; margin-bottom: 1rem;">Crear cuenta nueva</h3>
-                <input type="email" id="signup-email" placeholder="Tu email" />
-                <input type="password" id="signup-password" placeholder="Contraseña" />
-                <input type="password" id="signup-password-confirm" placeholder="Repetir contraseña" />
-                <button id="signup-btn">Registrarse</button>
-                <button class="toggle-btn" id="toggle-login">¿Ya tienes cuenta? Entra aquí</button>
-            </div>
+
+            <div class="sidebar-content" id="pisosList"></div>
+
+            <div class="stats" id="stats"></div>
         </div>
     </div>
-    
-    <!-- Control Panel -->
-    <div class="control-panel">
-        <div class="panel-header">
-            <h3>🗺 Búsqueda Sevilla</h3>
-            <div style="display:flex; gap:0.4rem;">
-                <button class="logout-btn" id="toggle-panel-btn" style="background:#6c757d;">▲</button>
-                <button class="logout-btn" id="logout-btn">Salir</button>
-            </div>
-        </div>
-        <div id="panel-body">
-        
-        <!-- Capas -->
-        <div class="panel-section">
-            <h4>🗂 Capas</h4>
-            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.9rem; cursor:pointer;">
-                <input type="checkbox" id="mostrar-barrios" checked /> Mostrar barrios de Sevilla
-            </label>
-            <div class="info-sync" id="barrios-status">Cargando barrios…</div>
-        </div>
-        
-        <!-- Candidatos -->
-        <div class="panel-section">
-            <h4>🏠 Candidatos</h4>
-            <input type="file" id="file-json" accept=".json" style="width:100%; margin-bottom:0.5rem; font-size:0.85rem;" />
-            <button class="btn-small" id="import-json-btn">📥 Cargar pisos del archivo</button>
-            <button class="btn-small" id="add-piso-btn" style="background:#28a745; margin-top: 0;">➕ Añadir piso a mano</button>
-            <div class="info-sync">Los cambios se sincronizan automáticamente entre Alex y Ana</div>
-            <div id="candidates-list"></div>
-        </div>
-        
-        <!-- Zonas manuales -->
-        <div class="panel-section">
-            <h4>✏️ Zonas dibujadas</h4>
-            <button class="btn-small" id="draw-toggle-btn">Dibujar zona</button>
-            <div id="zonas-list"></div>
-        </div>
-        
-        <!-- Barrios descartados -->
-        <div class="panel-section">
-            <h4>🚫 Barrios descartados</h4>
-            <div id="barrios-descartados-list"></div>
-        </div>
-        </div><!-- /panel-body -->
-    </div>
-    
-    <!-- Draw Bar -->
-    <div id="draw-bar">
-        <span id="draw-info">0 vértices</span>
-        <div style="display:flex; gap:1rem; align-items:center;">
-            <label style="font-size:0.9rem; display:flex; gap:0.3rem; align-items:center;">
-                <input type="radio" name="draw-type" value="zona" checked> Zona búsqueda
-            </label>
-            <label style="font-size:0.9rem; display:flex; gap:0.3rem; align-items:center;">
-                <input type="radio" name="draw-type" value="descartada"> Zona descartada
-            </label>
-        </div>
-        <button id="draw-undo">↶ Deshacer</button>
-        <button id="draw-save">✓ Guardar</button>
-        <button id="draw-cancel">✕ Cancelar</button>
-    </div>
-    
-    <!-- Candidate Modal -->
-    <div id="candidate-modal-overlay"></div>
-    <div id="candidate-modal">
-        <h3 id="modal-title">Editar candidato</h3>
-        <label>Nombre:</label>
-        <input type="text" id="cand-nombre" />
-        <label>Dirección (para situarlo en el mapa):</label>
-        <input type="text" id="cand-direccion" placeholder="Ej: Calle Asunción 12, Sevilla" />
-        <label>URL del anuncio:</label>
-        <input type="text" id="cand-url" />
-        <label>Precio (€):</label>
-        <input type="number" id="cand-price" />
-        <label>URL de foto:</label>
-        <input type="text" id="cand-foto" />
-        <div id="candidate-modal-actions">
-            <button class="modal-save" id="save-cand-btn">Guardar</button>
-            <button class="modal-close" id="close-modal-btn">Cerrar</button>
-        </div>
-    </div>
-    
-    <!-- Leyenda -->
-    <div class="leyenda">
-        <div class="leyenda-item">
-            <div class="leyenda-color" style="background: #FFD700;"></div>
-            <span>Favoritos ⭐</span>
-        </div>
-        <div class="leyenda-item">
-            <div class="leyenda-color" style="background: #FF4444;"></div>
-            <span>Pisos normales</span>
-        </div>
-        <div class="leyenda-item">
-            <div style="font-size:18px; color:#777; font-weight:bold; width:20px; text-align:center;">✕</div>
-            <span>Descartados ❌</span>
-        </div>
-        <div class="leyenda-item">
-            <div class="leyenda-color" style="background: #90EE90;"></div>
-            <span>Zonas de búsqueda</span>
-        </div>
-        <div class="leyenda-item">
-            <div class="leyenda-color" style="background: #FF6B6B;"></div>
-            <span>Barrios descartados</span>
-        </div>
-    </div>
-    
-    <!-- Scripts -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-    <!-- Scripts cargan al final -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0/+esm"></script>
-    
-    <script type="module">
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0/+esm';
-        
+
+    <!-- Input oculto para importar JSON -->
+    <input type="file" id="jsonInput" accept=".json" style="display: none;">
+
+    <script>
         // Inicializar Supabase
         const SUPABASE_URL = 'https://uiplwwuyibychqpgeauf.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_sXGkg8CwfGttJZO73sEM6g_AAkaj5TO';
-        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
         // Estado global
-        let map, modoDibujo = false, verticesDibujo = [];
-        let candidatos = [], zonasManuales = [], barrios = [], barrios_descartados = [];
-        let currentUser = null, currentCandidato = null;
-        let layerCandidatos, layerManuales, layerRefs, layerDibujo, layerBarrios;
-        let barriosData = null;
-        
-        const ESTILOS = {
-            barrio: { color: '#0066cc', weight: 1, fillColor: '#e6f2ff', fillOpacity: 0.25 },
-            manual: { color: '#228B22', weight: 2, fillColor: '#90EE90', fillOpacity: 0.4 },
-            descartada: { color: '#CC0000', weight: 2, fillColor: '#FF6B6B', fillOpacity: 0.35 },
-            ref: { radius: 9, fillColor: '#FF6B6B', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.9 },
-            cand: { radius: 10, fillColor: '#FFD700', color: '#333', weight: 2, opacity: 1, fillOpacity: 0.95 }
-        };
-        
-        const REFS = [
-            { nombre: 'C.C. Aleste', lat: 37.4067, lon: -5.9080 },
-            { nombre: 'Acar Tablada', lat: 37.3692, lon: -6.0098 }
-        ];
-        
-        // === LOGIN ===
-        document.getElementById('toggle-signup').addEventListener('click', () => {
-            document.getElementById('login-form').style.display = 'none';
-            document.getElementById('signup-form').style.display = 'block';
-        });
-        document.getElementById('toggle-login').addEventListener('click', () => {
-            document.getElementById('signup-form').style.display = 'none';
-            document.getElementById('login-form').style.display = 'block';
-        });
-        
-        document.getElementById('login-btn').addEventListener('click', loginUser);
-        document.getElementById('signup-btn').addEventListener('click', signupUser);
-        document.getElementById('logout-btn').addEventListener('click', logoutUser);
-        
-        async function loginUser() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            if (!email || !password) { showMsg('Email y contraseña requeridos'); return; }
-            
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) { showMsg(error.message); return; }
-            
-            currentUser = data.user;
-            await registrarUsuarioEnTabla();
-            hideLoginModal();
-            await initializeApp();
-        }
-        
-        async function signupUser() {
-            const email = document.getElementById('signup-email').value;
-            const password = document.getElementById('signup-password').value;
-            const confirm = document.getElementById('signup-password-confirm').value;
-            
-            if (!email || !password || !confirm) { showMsg('Todos los campos requeridos'); return; }
-            if (password !== confirm) { showMsg('Las contraseñas no coinciden'); return; }
-            
-            const { data, error } = await supabase.auth.signUp({ email, password });
-            if (error) { showMsg(error.message); return; }
-            
-            currentUser = data.user;
-            await registrarUsuarioEnTabla();
-            hideLoginModal();
-            await initializeApp();
-        }
-        
-        // Garantiza que el usuario exista en la tabla 'usuarios' (la FK de candidatos/zonas lo exige)
-        async function registrarUsuarioEnTabla() {
-            if (!currentUser) return;
-            await supabase.from('usuarios').upsert(
-                { id: currentUser.id, email: currentUser.email },
-                { onConflict: 'id' }
-            );
-        }
-        
-        async function logoutUser() {
-            await supabase.auth.signOut();
-            currentUser = null;
-            location.reload();
-        }
-        
-        function showMsg(msg) { document.getElementById('login-msg').textContent = msg; }
-        function hideLoginModal() { document.getElementById('login-modal').classList.remove('show'); }
-        
-        // === APP ===
-        async function initializeApp() {
-            initMap();
-            await loadCandidatos();
-            await loadZonasManuales();
-            await loadBarriosDescartados();
-            setupRealtimeListeners();
-            setupUIListeners();
-        }
-        
+        let map;
+        let pisos = [];
+        let markers = {};
+        let currentSort = 'favorito';
+        let refPoint1 = { name: 'C.C. Aleste Plaza', lat: 37.4067, lon: -5.9080 };
+        let refPoint2 = { name: 'Acar Tablada', lat: 37.3692, lon: -6.0098 };
+
+        // Inicializar mapa
         function initMap() {
-            map = L.map('map').setView([37.39, -5.98], 12);
+            map = L.map('map').setView([37.3886, -5.9823], 11);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap', maxZoom: 19
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
             }).addTo(map);
-            
-            layerBarrios = L.featureGroup().addTo(map);
-            layerManuales = L.featureGroup().addTo(map);
-            layerRefs = L.featureGroup().addTo(map);
-            layerCandidatos = L.featureGroup().addTo(map);
-            layerDibujo = L.featureGroup().addTo(map);
-            
-            REFS.forEach(ref => {
-                L.circleMarker([ref.lat, ref.lon], ESTILOS.ref).bindPopup(ref.nombre).addTo(layerRefs);
-            });
-            
-            loadBarrios();
+
+            // Puntos de referencia
+            L.circleMarker([refPoint1.lat, refPoint1.lon], {
+                radius: 8,
+                fillColor: '#00ff00',
+                color: '#00aa00',
+                weight: 2,
+                opacity: 0.8,
+                fillOpacity: 0.3
+            }).addTo(map).bindPopup(refPoint1.name);
+
+            L.circleMarker([refPoint2.lat, refPoint2.lon], {
+                radius: 8,
+                fillColor: '#00ff00',
+                color: '#00aa00',
+                weight: 2,
+                opacity: 0.8,
+                fillOpacity: 0.3
+            }).addTo(map).bindPopup(refPoint2.name);
         }
-        
-        async function loadBarrios() {
-            const status = document.getElementById('barrios-status');
-            const URL_BARRIOS = 'https://opendata.arcgis.com/api/v3/datasets/38827fc3eac142149801c2efa2a0bdf9_0/downloads/data?format=geojson&spatialRefId=4326';
-            try {
-                const res = await fetch(URL_BARRIOS);
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                barriosData = await res.json();
-                renderBarrios();
-                const n = (barriosData.features || []).length;
-                status.textContent = `${n} barrios cargados`;
-            } catch (e) {
-                console.error('Error cargando barrios:', e);
-                status.textContent = '⚠ No se pudieron cargar los barrios (revisa conexión)';
-            }
+
+        // Calcular distancia (Haversine)
+        function calcularDistancia(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
         }
-        
-        function renderBarrios() {
-            if (!barriosData) return;
-            layerBarrios.clearLayers();
-            
-            L.geoJSON(barriosData, {
-                style: (feature) => {
-                    const p = feature.properties || {};
-                    const nombre = p.Barrio || 'Barrio desconocido';
-                    return barrios_descartados.includes(nombre) ? ESTILOS.descartada : ESTILOS.barrio;
-                },
-                onEachFeature: (feature, layer) => {
-                    const p = feature.properties || {};
-                    const nombre = p.Barrio || 'Barrio desconocido';
-                    const descartado = barrios_descartados.includes(nombre);
-                    
-                    layer.bindTooltip(String(nombre) + (descartado ? ' (descartado)' : ''), { sticky: true });
-                    
-                    layer.on('click', async () => {
-                        if (confirm(`¿${descartado ? 'Recuperar' : 'Descartar'} "${nombre}"?`)) {
-                            if (descartado) {
-                                // Eliminar
-                                await supabase.from('barrios_descartados')
-                                    .delete()
-                                    .eq('barrio_name', nombre);
-                            } else {
-                                // Añadir
-                                await supabase.from('barrios_descartados')
-                                    .insert({ barrio_name: nombre, user_id: currentUser.id });
-                            }
-                            await loadBarriosDescartados();
-                        }
+
+        // Calcular distancia mínima a puntos de referencia
+        function distanciaMinima(lat, lon) {
+            const d1 = calcularDistancia(lat, lon, refPoint1.lat, refPoint1.lon);
+            const d2 = calcularDistancia(lat, lon, refPoint2.lat, refPoint2.lon);
+            return Math.min(d1, d2);
+        }
+
+        // Obtener color del marcador
+        function getMarkerColor(piso) {
+            if (piso.descartado) return '#888888';
+            if (piso.favorito) return '#FFD700';
+            if (piso.visto) return '#87CEEB';
+            return '#FF4444';
+        }
+
+        // Renderizar marcadores
+        function renderMarkers() {
+            Object.values(markers).forEach(m => map.removeLayer(m));
+            markers = {};
+
+            pisos.forEach(piso => {
+                if (piso.lat && piso.lon) {
+                    const color = getMarkerColor(piso);
+                    const marker = L.circleMarker([piso.lat, piso.lon], {
+                        radius: 7,
+                        fillColor: color,
+                        color: color,
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8,
+                        bubblingMouseEvents: false
+                    }).addTo(map).bindPopup(`<b>${piso.nombre}</b><br>${piso.precio}€`);
+
+                    marker.on('click', () => {
+                        document.getElementById('pisosList').scrollTop = 
+                            document.querySelector(`[data-piso="${piso.n}"]`)?.offsetTop || 0;
                     });
+
+                    markers[piso.n] = marker;
                 }
-            }).addTo(layerBarrios);
-        }
-        
-        function toggleBarrios() {
-            const visible = document.getElementById('mostrar-barrios').checked;
-            if (visible) {
-                if (!map.hasLayer(layerBarrios)) layerBarrios.addTo(map);
-            } else {
-                if (map.hasLayer(layerBarrios)) map.removeLayer(layerBarrios);
-            }
-        }
-        
-        async function loadCandidatos() {
-            const { data, error } = await supabase
-                .from('candidatos')
-                .select('*');
-            
-            if (error) { console.error(error); return; }
-            candidatos = data || [];
-            renderCandidatos();
-        }
-        
-        async function loadZonasManuales() {
-            const { data, error } = await supabase
-                .from('zonas_manuales')
-                .select('*');
-            
-            if (error) { console.error(error); return; }
-            zonasManuales = data || [];
-            renderZonasManuales();
-        }
-        
-        async function loadBarriosDescartados() {
-            const { data, error } = await supabase
-                .from('barrios_descartados')
-                .select('barrio_name');
-            
-            if (error) { console.error(error); return; }
-            barrios_descartados = (data || []).map(d => d.barrio_name);
-            renderBarriosDescartadosList();
-            renderBarrios();
-        }
-        
-        function renderBarriosDescartadosList() {
-            const list = document.getElementById('barrios-descartados-list');
-            if (!barrios_descartados || barrios_descartados.length === 0) {
-                list.innerHTML = '<div class="info-sync">Ninguno descartado</div>';
-                return;
-            }
-            list.innerHTML = '';
-            barrios_descartados.forEach(nombre => {
-                const div = document.createElement('div');
-                div.className = 'zona-item';
-                div.innerHTML = `
-                    <span>${nombre}</span>
-                    <button onclick="window.recuperarBarrio('${nombre}')" class="btn-success">↶</button>
-                `;
-                list.appendChild(div);
             });
         }
-        
-        window.recuperarBarrio = async function(nombre) {
-            await supabase.from('barrios_descartados')
-                .delete()
-                .eq('barrio_name', nombre);
-            await loadBarriosDescartados();
-        };
-        
-        function setupRealtimeListeners() {
-            supabase.channel('candidatos-changes')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'candidatos' },
-                    () => loadCandidatos())
-                .subscribe();
-            
-            supabase.channel('zonas-changes')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'zonas_manuales' },
-                    () => loadZonasManuales())
-                .subscribe();
-            
-            supabase.channel('barrios-descartados-changes')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'barrios_descartados' },
-                    () => loadBarriosDescartados())
-                .subscribe();
-        }
-        
-        function setupUIListeners() {
-            document.getElementById('mostrar-barrios').addEventListener('change', toggleBarrios);
-            document.getElementById('draw-toggle-btn').addEventListener('click', toggleDibujo);
-            document.getElementById('draw-save').addEventListener('click', saveDibujo);
-            document.getElementById('draw-cancel').addEventListener('click', cancelDibujo);
-            document.getElementById('draw-undo').addEventListener('click', undoDibujo);
-            document.getElementById('import-json-btn').addEventListener('click', importarJSON);
-            document.getElementById('toggle-panel-btn').addEventListener('click', () => {
-                const panel = document.querySelector('.control-panel');
-                const btn = document.getElementById('toggle-panel-btn');
-                panel.classList.toggle('collapsed');
-                btn.textContent = panel.classList.contains('collapsed') ? '▼' : '▲';
-            });
-            document.getElementById('add-piso-btn').addEventListener('click', nuevoCandidato);
-            document.getElementById('save-cand-btn').addEventListener('click', saveCandidato);
-            document.getElementById('close-modal-btn').addEventListener('click', closeModal);
-            document.getElementById('candidate-modal-overlay').addEventListener('click', closeModal);
-            
-            map.on('click', handleMapClick);
-        }
-        
-        function renderCandidatos() {
-            const list = document.getElementById('candidates-list');
+
+        // Renderizar lista de pisos
+        function renderList() {
+            const list = document.getElementById('pisosList');
             list.innerHTML = '';
-            candidatos.forEach(c => {
-                const d = c.detalles || {};
-                const sub = [d.hab ? d.hab + 'h' : null, d.m2 ? d.m2 + 'm²' : null].filter(Boolean).join(' · ');
-                const estrella = c.favorito ? '⭐' : '☆';
-                const div = document.createElement('div');
-                div.className = 'candidate-item' + (c.favorito ? ' favorite' : '') + (c.descartado ? ' descartado' : '');
-                div.innerHTML = `
-                    <div class="candidate-item-header" onclick="window.toggleDetalle('${c.id}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; width:100%;">
-                        <div style="flex:1;">
-                            <span class="candidate-item-name">${c.nombre}</span>
-                            <span class="candidate-item-price">${c.price ? c.price + '€' : '-'}</span>
-                        </div>
-                        <button onclick="event.stopPropagation(); window.toggleFavorito('${c.id}')" class="btn-estrella" title="Favorito">${estrella}</button>
-                        <button onclick="event.stopPropagation(); window.toggleDescartado('${c.id}')" class="btn-descarte${c.descartado ? ' activo' : ''}" title="Descartar">${c.descartado ? '❌' : '✕'}</button>
-                    </div>
-                    ${sub ? `<div style="font-size:0.78rem; color:#666; margin-top:2px;">${sub} <span style="color:#0066cc;">· toca para ver ▾</span></div>` : `<div style="font-size:0.78rem; color:#0066cc; margin-top:2px;">toca para ver ▾</div>`}
-                    <div id="detalle-${c.id}" class="candidate-detalle" style="display:none;">
-                        ${d.planta ? `<div class="det-row">🏢 ${d.planta}</div>` : ''}
-                        ${d.notas ? `<div class="det-notas">📝 ${d.notas}</div>` : ''}
-                        ${c.url ? `<a href="${c.url}" target="_blank" rel="noopener" class="btn-ver-anuncio">🔗 Ver anuncio en Idealista ↗</a>` : '<div style="font-size:0.8rem; color:#999;">Sin enlace</div>'}
-                        <div class="candidate-item-actions">
-                            <button onclick="event.stopPropagation(); window.centrarEnMapa('${c.id}')">📍 Ver en mapa</button>
-                            <button onclick="event.stopPropagation(); window.editarCandidato('${c.id}')">✎ Editar</button>
-                            <button onclick="event.stopPropagation(); window.eliminarCandidato('${c.id}')" class="btn-danger">🗑</button>
+
+            pisos.forEach(piso => {
+                const card = document.createElement('div');
+                card.className = 'piso-card' + (piso.descartado ? ' descartado' : '') + 
+                                 (piso.favorito ? ' favorito' : '') + 
+                                 (piso.visto ? ' visto' : '');
+                card.dataset.piso = piso.n;
+
+                const distancia = distanciaMinima(piso.lat, piso.lon);
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <input type="checkbox" class="card-checkbox" 
+                               ${piso.visto ? 'checked' : ''} 
+                               data-piso="${piso.n}" title="Marcar como visto">
+                        <span class="card-number">#${piso.n}</span>
+                        <span class="card-title">${piso.nombre}</span>
+                        <div class="card-actions">
+                            <button class="action-btn favorito ${piso.favorito ? 'favorito' : ''}" 
+                                    data-action="favorito" data-piso="${piso.n}" title="Favorito">⭐</button>
+                            <button class="action-btn descartado ${piso.descartado ? 'descartado' : ''}" 
+                                    data-action="descartado" data-piso="${piso.n}" title="Descartar">✕</button>
                         </div>
                     </div>
+                    <div class="card-info">
+                        <div class="info-row">
+                            <span class="info-label">💶</span>
+                            <span class="info-value">${piso.precio}€/mes</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">📏</span>
+                            <span class="info-value">${piso.m2} m²</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">🛏️</span>
+                            <span class="info-value">${piso.hab} hab</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">📍</span>
+                            <span class="info-value">${distancia.toFixed(1)} km</span>
+                        </div>
+                    </div>
+                    <a href="${piso.url}" target="_blank" class="card-link" title="${piso.url}">🔗 ${piso.fuentes}</a>
+                    ${piso.notas ? `<div class="card-notas">${piso.notas}</div>` : ''}
                 `;
-                list.appendChild(div);
-            });
-            renderCandidatosMap();
-        }
 
-        window.toggleFavorito = async function(id) {
-            const c = candidatos.find(x => x.id === id);
-            if (!c) return;
-            
-            const nuevo = !c.favorito;
-            // Favorito y descartado son excluyentes: marcar favorito quita descarte
-            const { error } = await supabase.from('candidatos')
-                .update({ favorito: nuevo, descartado: nuevo ? false : c.descartado })
-                .eq('id', id);
-            
-            if (!error) {
-                console.log(`⭐ ${nuevo ? 'Marcado' : 'Desmarcado'}: ${c.nombre}`);
-                await loadCandidatos();
-            }
-        };
-
-        window.toggleDescartado = async function(id) {
-            const c = candidatos.find(x => x.id === id);
-            if (!c) return;
-            
-            const nuevo = !c.descartado;
-            // Descartar quita favorito (no tiene sentido un favorito descartado)
-            const { error } = await supabase.from('candidatos')
-                .update({ descartado: nuevo, favorito: nuevo ? false : c.favorito })
-                .eq('id', id);
-            
-            if (!error) {
-                console.log(`❌ ${nuevo ? 'Descartado' : 'Recuperado'}: ${c.nombre}`);
-                await loadCandidatos();
-            }
-        };
-
-        window.toggleDetalle = function(id) {
-            const el = document.getElementById('detalle-' + id);
-            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-        };
-
-        window.centrarEnMapa = function(id) {
-            const c = candidatos.find(x => x.id === id);
-            if (c && c.lat && c.lon) {
-                map.flyTo([c.lat, c.lon], 15, { duration: 0.8 });
-                const m = markersCandidatos[id];
-                if (m) setTimeout(() => m.openPopup(), 850);
-            }
-        };
-        
-        let markersCandidatos = {};
-        function renderCandidatosMap() {
-            layerCandidatos.clearLayers();
-            markersCandidatos = {};
-            candidatos.forEach(c => {
-                if (c.lat && c.lon) {
-                    let marker;
-                    if (c.descartado) {
-                        // Descartado → cruz gris (divIcon) en vez de círculo
-                        const icono = L.divIcon({
-                            className: 'marcador-descartado',
-                            html: '<div style="font-size:22px; font-weight:bold; color:#777; text-shadow:0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; line-height:1;">✕</div>',
-                            iconSize: [22, 22],
-                            iconAnchor: [11, 11]
-                        });
-                        marker = L.marker([c.lat, c.lon], { icon: icono, bubblingMouseEvents: false });
-                    } else {
-                        // Favorito (amarillo) o normal (rojo)
-                        const estilo = c.favorito 
-                            ? { radius: 11, fillColor: '#FFD700', color: '#fff', weight: 3, opacity: 1, fillOpacity: 0.95 }
-                            : { radius: 10, fillColor: '#FF4444', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.95 };
-                        marker = L.circleMarker([c.lat, c.lon], { ...estilo, bubblingMouseEvents: false });
-                    }
-                    const d = c.detalles || {};
-                    let popup = `<div style="min-width:200px; max-width:260px; font-size:0.9rem; line-height:1.4;">`;
-                    popup += `<div style="font-weight:bold; font-size:1rem; margin-bottom:4px;">${c.nombre}${c.favorito ? ' ⭐' : ''}${c.descartado ? ' ❌' : ''}</div>`;
-                    if (c.price) popup += `<div style="color:#0066cc; font-weight:bold; font-size:1.15rem;">${c.price} €/mes</div>`;
-                    let linea = [];
-                    if (d.hab) linea.push(`🛏 ${d.hab} hab`);
-                    if (d.m2) linea.push(`📐 ${d.m2} m²`);
-                    if (linea.length) popup += `<div style="margin:4px 0;">${linea.join(' · ')}</div>`;
-                    if (d.planta) popup += `<div style="color:#555; margin:2px 0;">🏢 ${d.planta}</div>`;
-                    if (d.notas) popup += `<div style="background:#f5f5f5; padding:5px; border-radius:4px; margin:6px 0; font-size:0.82rem;">📝 ${d.notas}</div>`;
-                    if (c.url) popup += `<a href="${c.url}" target="_blank" rel="noopener" style="display:block; text-align:center; margin-top:6px; background:#0066cc; color:white; padding:9px; border-radius:6px; text-decoration:none; font-weight:bold;">Ver anuncio ↗</a>`;
-                    popup += `</div>`;
-                    marker.bindPopup(popup, { maxWidth: 280 });
-                    marker.addTo(layerCandidatos);
-                    markersCandidatos[c.id] = marker;
-                }
-            });
-        }
-        
-        function renderZonasManuales() {
-            const list = document.getElementById('zonas-list');
-            list.innerHTML = '';
-            zonasManuales.forEach(z => {
-                const div = document.createElement('div');
-                div.className = 'zona-item';
-                div.innerHTML = `
-                    <span>${z.nombre}</span>
-                    <button onclick="window.eliminarZona('${z.id}')" class="btn-danger">🗑</button>
-                `;
-                list.appendChild(div);
-            });
-            renderZonasMap();
-        }
-        
-        function renderZonasMap() {
-            layerManuales.clearLayers();
-            zonasManuales.forEach(z => {
-                if (z.geojson) {
-                    const estilo = z.tipo === 'descartada' ? ESTILOS.descartada : ESTILOS.manual;
-                    L.geoJSON(z.geojson, { style: estilo }).addTo(layerManuales);
-                }
-            });
-        }
-        
-        function toggleDibujo() {
-            modoDibujo = !modoDibujo;
-            document.getElementById('draw-bar').classList.toggle('show');
-            if (!modoDibujo) {
-                verticesDibujo = [];
-                layerDibujo.clearLayers();
-            }
-        }
-        
-        function handleMapClick(e) {
-            if (modoDibujo) {
-                verticesDibujo.push([e.latlng.lat, e.latlng.lng]);
-                layerDibujo.clearLayers();
-                verticesDibujo.forEach(v => L.circleMarker(v, { radius: 4, color: 'red' }).addTo(layerDibujo));
-                if (verticesDibujo.length > 1) {
-                    L.polyline(verticesDibujo, { color: 'red', weight: 2, dashArray: '5,5' }).addTo(layerDibujo);
-                }
-                document.getElementById('draw-info').textContent = `${verticesDibujo.length} vértices`;
-            }
-        }
-        
-        async function saveDibujo() {
-            if (verticesDibujo.length < 3) { alert('Necesitas al menos 3 vértices'); return; }
-            const nombre = prompt('Nombre de la zona:');
-            if (!nombre) return;
-            
-            const tipo = document.querySelector('input[name="draw-type"]:checked').value;
-            
-            const geojson = {
-                type: 'Polygon',
-                coordinates: [[...verticesDibujo.map(v => [v[1], v[0]]), [verticesDibujo[0][1], verticesDibujo[0][0]]]]
-            };
-            
-            const { error } = await supabase.from('zonas_manuales').insert({
-                user_id: currentUser.id,
-                nombre,
-                tipo,
-                geojson
-            });
-            
-            if (error) {
-                alert('No se pudo guardar la zona:\n' + error.message);
-                return;
-            }
-            await loadZonasManuales();
-            cancelDibujo();
-        }
-        
-        function cancelDibujo() {
-            modoDibujo = false;
-            verticesDibujo = [];
-            layerDibujo.clearLayers();
-            document.getElementById('draw-bar').classList.remove('show');
-        }
-        
-        function undoDibujo() {
-            verticesDibujo.pop();
-            layerDibujo.clearLayers();
-            verticesDibujo.forEach(v => L.circleMarker(v, { radius: 4, color: 'red' }).addTo(layerDibujo));
-            if (verticesDibujo.length > 1) {
-                L.polyline(verticesDibujo, { color: 'red', weight: 2, dashArray: '5,5' }).addTo(layerDibujo);
-            }
-            document.getElementById('draw-info').textContent = `${verticesDibujo.length} vértices`;
-        }
-        
-        function nuevoCandidato() {
-            currentCandidato = null;
-            document.getElementById('modal-title').textContent = 'Nuevo piso';
-            document.getElementById('cand-nombre').value = '';
-            document.getElementById('cand-direccion').value = '';
-            document.getElementById('cand-url').value = '';
-            document.getElementById('cand-price').value = '';
-            document.getElementById('cand-foto').value = '';
-            document.getElementById('candidate-modal-overlay').classList.add('show');
-            document.getElementById('candidate-modal').classList.add('show');
-        }
-        
-        window.editarCandidato = function(id) {
-            currentCandidato = candidatos.find(c => c.id === id);
-            if (!currentCandidato) return;
-            
-            document.getElementById('modal-title').textContent = 'Editar piso';
-            document.getElementById('cand-nombre').value = currentCandidato.nombre;
-            document.getElementById('cand-direccion').value = '';
-            document.getElementById('cand-url').value = currentCandidato.url || '';
-            document.getElementById('cand-price').value = currentCandidato.price || '';
-            document.getElementById('cand-foto').value = currentCandidato.foto || '';
-            
-            document.getElementById('candidate-modal-overlay').classList.add('show');
-            document.getElementById('candidate-modal').classList.add('show');
-        };
-        
-        // Geocodifica una dirección a {lat, lon} con Nominatim; null si no la encuentra
-        async function geocodeDireccion(texto) {
-            const q = encodeURIComponent(texto + ', Sevilla, España');
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`);
-                const data = await res.json();
-                if (!data.length) return null;
-                return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-            } catch (e) {
-                console.error(e);
-                return null;
-            }
-        }
-        
-        async function saveCandidato() {
-            const nombre = document.getElementById('cand-nombre').value.trim();
-            const direccion = document.getElementById('cand-direccion').value.trim();
-            if (!nombre) { alert('Ponle al menos un nombre al piso.'); return; }
-            
-            const campos = {
-                nombre,
-                url: document.getElementById('cand-url').value || null,
-                price: parseInt(document.getElementById('cand-price').value) || null,
-                foto: document.getElementById('cand-foto').value || null,
-                favorito: false,
-                descartado: false
-            };
-            
-            // Si han escrito dirección, geocodificar para situarlo en el mapa
-            if (direccion) {
-                const coords = await geocodeDireccion(direccion);
-                if (coords) {
-                    campos.lat = coords.lat;
-                    campos.lon = coords.lon;
-                } else {
-                    alert('No encontré esa dirección en el mapa. Guardo el piso igualmente, pero sin marcador. Puedes editarlo y reintentar.');
-                }
-            }
-            
-            let error;
-            if (currentCandidato) {
-                ({ error } = await supabase.from('candidatos').update(campos).eq('id', currentCandidato.id));
-            } else {
-                campos.user_id = currentUser.id;
-                ({ error } = await supabase.from('candidatos').insert(campos));
-            }
-            
-            if (error) {
-                alert('No se pudo guardar el piso:\n' + error.message);
-                return;
-            }
-            await loadCandidatos();
-            closeModal();
-        }
-        
-        window.eliminarCandidato = async function(id) {
-            if (!confirm('¿Eliminar este candidato?')) return;
-            await supabase.from('candidatos').delete().eq('id', id);
-            await loadCandidatos();
-        };
-        
-        window.eliminarZona = async function(id) {
-            if (!confirm('¿Eliminar esta zona?')) return;
-            await supabase.from('zonas_manuales').delete().eq('id', id);
-            await loadZonasManuales();
-        };
-        
-        function closeModal() {
-            document.getElementById('candidate-modal-overlay').classList.remove('show');
-            document.getElementById('candidate-modal').classList.remove('show');
-            currentCandidato = null;
-        }
-        
-        function leerArchivoJSON(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    try { resolve(JSON.parse(e.target.result)); }
-                    catch (err) { reject(new Error('El archivo no es un JSON válido')); }
-                };
-                reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
-                reader.readAsText(file);
-            });
-        }
-
-        async function importarJSON() {
-            try {
-                const fileInput = document.getElementById('file-json');
-                const file = fileInput.files[0];
-
-                if (!file) {
-                    alert('❌ Selecciona primero el archivo de pisos (.json)');
-                    return;
-                }
-
-                console.log('📂 Leyendo:', file.name);
-                const datos = await leerArchivoJSON(file);
-
-                // Estructura nueva: { pisos: [...], eliminados: [...] }
-                // Si es un array directo (viejo formato), convertir
-                let pisos, eliminados = [];
-                if (Array.isArray(datos)) {
-                    pisos = datos;
-                } else if (datos.pisos && Array.isArray(datos.pisos)) {
-                    pisos = datos.pisos;
-                    eliminados = datos.eliminados || [];
-                } else {
-                    alert('❌ El archivo no contiene una estructura válida (esperado: { pisos: [...], eliminados: [...] })');
-                    return;
-                }
-
-                console.log('📊 Pisos en el archivo:', pisos.length);
-                console.log('🗑 Pisos a eliminar:', eliminados.length);
-                if (eliminados.length) {
-                    console.log('URLs de eliminados:', eliminados.slice(0, 3).join(', ') + (eliminados.length > 3 ? '...' : ''));
-                }
-
-                // ====== FASE 1: ELIMINAR PISOS OBSOLETOS ======
-                let deletedCount = 0;
-                for (const url of eliminados) {
-                    const { error } = await supabase.from('candidatos')
-                        .delete()
-                        .eq('url', url);
-                    if (!error) {
-                        deletedCount++;
-                        console.log(`🗑 Eliminado de BD: ${url}`);
-                    }
-                }
-                if (deletedCount > 0) {
-                    console.log(`✅ ${deletedCount} pisos obsoletos borrados de la BD`);
-                }
-
-                // ====== FASE 2: CARGAR PISOS NUEVOS/ACTUALIZADOS ======
-                // Cargar URLs ya existentes para no duplicar
-                const urlsExistentes = new Set(candidatos.filter(c => c.url).map(c => c.url));
-
-                let nuevos = 0, actualizados = 0;
-
-                for (let i = 0; i < pisos.length; i++) {
-                    const p = pisos[i];
-                    if (!p.lat || !p.lon) {
-                        console.log(`⚠️ Piso sin coordenadas, saltado: ${p.nombre}`);
-                        continue;
-                    }
-
-                    const registro = {
-                        nombre: p.nombre || 'Sin nombre',
-                        url: p.url || null,
-                        price: p.precio || null,
-                        lat: parseFloat(p.lat),
-                        lon: parseFloat(p.lon),
-                        favorito: false,
-                        descartado: false,
-                        detalles: {
-                            hab: p.hab || '',
-                            m2: p.m2 || '',
-                            planta: p.planta || '',
-                            notas: p.notas || '',
-                            zona: p.nombre || ''
-                        }
-                    };
-
-                    if (p.url && urlsExistentes.has(p.url)) {
-                        // Ya existe → actualizar, pero preservar favorito y descartado
-                        const pisoExistente = candidatos.find(c => c.url === p.url);
-                        registro.favorito = pisoExistente ? pisoExistente.favorito : false;
-                        registro.descartado = pisoExistente ? pisoExistente.descartado : false;
-                        const { error } = await supabase.from('candidatos')
-                            .update(registro).eq('url', p.url);
-                        if (error) console.error('Error actualizando:', error);
-                        else { actualizados++; console.log(`🔄 Actualizado: ${p.nombre}`); }
-                    } else {
-                        // Nuevo → insertar
-                        registro.user_id = currentUser.id;
-                        const { error } = await supabase.from('candidatos').insert(registro);
-                        if (error) console.error('Error insertando:', error);
-                        else { nuevos++; console.log(`✅ Insertado: ${p.nombre}`); }
-                    }
-                }
-
-                await loadCandidatos();
-
-                // Mensaje final con el resumen completo
-                const msg = `✅ ¡LISTO!\n\n🆕 Nuevos: ${nuevos}\n🔄 Actualizados: ${actualizados}\n🗑 Eliminados: ${deletedCount}\n\nEl mapa se ha actualizado. Los pisos obsoletos han desaparecido.`;
-                alert(msg);
-                fileInput.value = '';
-
-            } catch (error) {
-                console.error('❌ Error en importarJSON():', error);
-                alert(`❌ Error al importar:\n${error.message}`);
-            }
-        }
-
-        async function geocodificarPiso(piso) {
-            const q = encodeURIComponent(piso.direccion + ', Sevilla, España');
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`);
-                const data = await res.json();
-                if (data.length === 0) return;
-                
-                const { lat, lon } = data[0];
-                const { error } = await supabase.from('candidatos').insert({
-                    user_id: currentUser.id,
-                    nombre: piso.direccion,
-                    url: piso.url,
-                    price: piso.precio,
-                    foto: piso.foto,
-                    lat: parseFloat(lat),
-                    lon: parseFloat(lon),
-                    favorito: false,
-                    descartado: false
+                // Event listeners para estado
+                card.querySelector('.card-checkbox').addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    toggleVisto(piso.n);
                 });
-                
-                if (!error) await loadCandidatos();
-            } catch (e) {
-                console.error(e);
-            }
+
+                card.querySelectorAll('[data-action]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const action = btn.dataset.action;
+                        if (action === 'favorito') toggleFavorito(piso.n);
+                        else if (action === 'descartado') toggleDescartado(piso.n);
+                    });
+                });
+
+                list.appendChild(card);
+            });
+
+            updateStats();
         }
-        
-        // Inicializar
-        window.addEventListener('DOMContentLoaded', async () => {
-            const { data } = await supabase.auth.getSession();
-            if (data.session) {
-                currentUser = data.session.user;
-                await registrarUsuarioEnTabla();
-                hideLoginModal();
-                await initializeApp();
+
+        // Toggle visto
+        async function toggleVisto(pisoN) {
+            const piso = pisos.find(p => p.n === pisoN);
+            piso.visto = !piso.visto;
+            renderList();
+            renderMarkers();
+        }
+
+        // Toggle favorito
+        function toggleFavorito(pisoN) {
+            const piso = pisos.find(p => p.n === pisoN);
+            if (piso.descartado) return;
+            piso.favorito = !piso.favorito;
+            renderList();
+            renderMarkers();
+        }
+
+        // Toggle descartado
+        function toggleDescartado(pisoN) {
+            const piso = pisos.find(p => p.n === pisoN);
+            piso.descartado = !piso.descartado;
+            if (piso.descartado) {
+                piso.favorito = false;
+            }
+            renderList();
+            renderMarkers();
+        }
+
+        // Ordenamiento
+        function sortPisos() {
+            const sort = document.getElementById('sortBy').value;
+            
+            const pisosCopy = [...pisos];
+            
+            switch(sort) {
+                case 'favorito':
+                    pisosCopy.sort((a, b) => (b.favorito ? 1 : 0) - (a.favorito ? 1 : 0));
+                    break;
+                case 'precio_asc':
+                    pisosCopy.sort((a, b) => a.precio - b.precio);
+                    break;
+                case 'precio_desc':
+                    pisosCopy.sort((a, b) => b.precio - a.precio);
+                    break;
+                case 'distancia':
+                    pisosCopy.sort((a, b) => {
+                        const dA = distanciaMinima(a.lat, a.lon);
+                        const dB = distanciaMinima(b.lat, b.lon);
+                        return dA - dB;
+                    });
+                    break;
+                case 'fecha_desc':
+                    pisosCopy.sort((a, b) => {
+                        const dateA = a.fecha_subida ? new Date(a.fecha_subida) : new Date(0);
+                        const dateB = b.fecha_subida ? new Date(b.fecha_subida) : new Date(0);
+                        return dateB - dateA;
+                    });
+                    break;
+                case 'fecha_asc':
+                    pisosCopy.sort((a, b) => {
+                        const dateA = a.fecha_subida ? new Date(a.fecha_subida) : new Date(0);
+                        const dateB = b.fecha_subida ? new Date(b.fecha_subida) : new Date(0);
+                        return dateA - dateB;
+                    });
+                    break;
+                case 'estado':
+                    pisosCopy.sort((a, b) => (a.visto ? 1 : 0) - (b.visto ? 1 : 0));
+                    break;
+            }
+            
+            pisos = pisosCopy;
+            renderList();
+        }
+
+        // Estadísticas
+        function updateStats() {
+            const total = pisos.length;
+            const vistos = pisos.filter(p => p.visto).length;
+            const favoritos = pisos.filter(p => p.favorito).length;
+            const descartados = pisos.filter(p => p.descartado).length;
+            const activos = total - descartados;
+
+            document.getElementById('stats').innerHTML = `
+                <strong>📊 Estadísticas:</strong><br>
+                Total: ${total} | Activos: ${activos} | Vistos: ${vistos} | 
+                ⭐ ${favoritos} | ✕ ${descartados}
+            `;
+        }
+
+        // Importar JSON
+        document.getElementById('importBtn').addEventListener('click', () => {
+            document.getElementById('jsonInput').click();
+        });
+
+        document.getElementById('jsonInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const data = JSON.parse(event.target.result);
+                    pisos = data.pisos.map(p => ({
+                        ...p,
+                        favorito: p.favorito || false,
+                        descartado: p.descartado || false,
+                        visto: p.visto || false
+                    }));
+                    sortPisos();
+                    renderMarkers();
+                    renderList();
+                };
+                reader.readAsText(file);
             }
         });
+
+        // Exportar
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const data = {
+                pisos: pisos,
+                fecha_exportacion: new Date().toISOString(),
+                total_pisos: pisos.length
+            };
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pisos_sevilla_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        });
+
+        // Toggle sidebar (móvil)
+        document.getElementById('toggleSidebar').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+            document.getElementById('toggleSidebar').textContent = 
+                document.getElementById('sidebar').classList.contains('collapsed') ? '▼' : '▲';
+        });
+
+        // Event listener para ordenamiento
+        document.getElementById('sortBy').addEventListener('change', sortPisos);
+
+        // Inicializar
+        initMap();
+
+        console.log('✓ GIS v2 cargado con ordenamiento y estado "visto"');
     </script>
 </body>
 </html>
